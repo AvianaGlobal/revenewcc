@@ -3,8 +3,8 @@ from gooey import Gooey, GooeyParser
 
 
 @Gooey(program_name='\nRevenewML\nCC Supplier Ranking\n',
-       dump_build_config=True,
-       # load_build_config='gooey_config.json',
+       # dump_build_config=True,
+       load_build_config='gooey_config.json',
        monospace_display=True,
        default_size=(760, 540))
 def main():

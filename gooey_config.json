@@ -52,7 +52,7 @@
       "command": "::gooey/default",
       "contents": [
         {
-          "name": "Required Arguments",
+          "name": "Database Connection",
           "items": [
             {
               "id": "dsn",
@@ -90,7 +90,7 @@
           }
         },
         {
-          "name": "Optional Arguments",
+          "name": "Client Type",
           "items": [
             {
               "id": "fdcb06db-5798-46a0-bd9e-60547867272b",
