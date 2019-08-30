@@ -1,0 +1,7 @@
+include config.ini
+include LICENSE
+include revenewML.db
+include revenewSPR/preprocessing/sql/*
+include revenewSPR/savedmodels/*
+include revenewCC/inputdata/*
+include gooey/*
