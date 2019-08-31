@@ -232,8 +232,7 @@ def main():
                   f'[Vendor Name] as Supplier, ' \
                   f'[Gross Invoice Amount] as Gross_Invoice_Amount ' \
                   f'from {db_tbl}'
-            input_df = pd.read_sql(
-            )
+            input_df = pd.read_sql(qry, engine)
         elif filename is not None:
             input_df = pd.read_csv(filename,  encoding='ISO-8859-1', sep='\t')
             input_df['Supplier'] = input_df['Supplier'].astype(str)

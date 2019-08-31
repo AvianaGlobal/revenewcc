@@ -1,7 +1,10 @@
 include config.ini
 include LICENSE
 include revenewML.db
-include revenewSPR/preprocessing/sql/*
-include revenewSPR/savedmodels/*
-include revenewCC/inputdata/*
-include gooey/*
+include gooey_config.json
+include revenewSPR/preprocessing/sql/*.sql
+include revenewSPR/savedmodels/*.dat
+include revenewCC/inputdata/*.csv
+include gooey/images/*.png
+include gooey/languages/*.json
+include gooey/tests/*.json
