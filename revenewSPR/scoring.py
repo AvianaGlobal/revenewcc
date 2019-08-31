@@ -235,10 +235,9 @@ def main():
     correlations = scoring_data.corr()
 
     # Load calibrated model
-    saved_model = application_path + '/revenewSPR/savedmodels/' + modelfile
     logging.info(
-        f'\nStep 3 of 6: Scoring data with pre-calibrated XGBoost model "{saved_model}"... ({time.ctime()})\n')
-    clf = pickle.load(open(saved_model, 'rb'))
+        f'\nStep 3 of 6: Scoring data with pre-calibrated XGBoost model "{modelfile}"... ({time.ctime()})\n')
+    clf = pickle.load(open(modelfile, 'rb'))
 
     # Predicted probabilities
     y_prob = pd.merge(scoring_data[['AmountNet__NETONE_Mean', 'AmountNet__NETZERO_Mean']].reset_index(),
