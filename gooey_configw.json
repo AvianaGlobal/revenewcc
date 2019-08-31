@@ -1,12 +1,12 @@
 {
   "language": "english",
-  "target": "'/anaconda3/envs/revenew/bin/python' -u '/Users/mj/Desktop/code/revenewML/revenewCC/ranking.py'",
+  "target": "\"C:\\Users\\mj\\Anaconda3\\python.exe\" -u \"C:\\Users\\mj\\Anaconda3\\Scripts\\rankcc\"",
   "program_name": "\nRevenewML\nCC Supplier Ranking\n",
   "program_description": "",
   "sidebar_title": "Actions",
   "default_size": [
-    760,
-    540
+    610,
+    530
   ],
   "auto_start": false,
   "show_advanced": true,
@@ -21,9 +21,9 @@
   "num_required_cols": 2,
   "num_optional_cols": 2,
   "manual_start": false,
-  "monospace_display": true,
+  "monospace_display": false,
   "image_dir": "::gooey/default",
-  "language_dir": "/Users/mj/Desktop/code/revenewML/gooey/languages",
+  "language_dir": "c:\\users\\mj\\revenewcc\\gooey\\languages",
   "progress_regex": null,
   "progress_expr": null,
   "disable_progress_bar_animation": false,
@@ -48,7 +48,7 @@
   "error_color": "#ea7878",
   "layout": "standard",
   "widgets": {
-    "ranking.py": {
+    "rankcc": {
       "command": "::gooey/default",
       "contents": [
         {
@@ -93,7 +93,7 @@
           "name": "Client Type",
           "items": [
             {
-              "id": "fdcb06db-5798-46a0-bd9e-60547867272b",
+              "id": "cefe55cc-4ae7-46d2-996d-dca4689bf976",
               "type": "RadioGroup",
               "cli_type": "optional",
               "group_name": "Choose Option",
