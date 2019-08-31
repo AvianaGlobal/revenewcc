@@ -40,7 +40,7 @@ def main():
     handler = logging.StreamHandler()
     logger = logging.getLogger()
     logger.addHandler(handler)
-    logging.info('\n<===============================================================>')
+    logging.info('\n<=============================================================>')
     logging.info(f'\nApplication path: {application_path}')
     logging.info(f'\nCurrent working directory: {os.getcwd()}')
     logging.info(f'\nApplication started ... ({time.ctime()})\n')
