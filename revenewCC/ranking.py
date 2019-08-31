@@ -36,11 +36,11 @@ def main():
     # Set up logging
     start = timer()
     log_file = application_path + '/../log.txt'
-    logging.basicConfig(filename=log_file, level=logging.DEBUG)
+    logging.basicConfig(filename=log_file, level=logging.INFO)
     handler = logging.StreamHandler()
     logger = logging.getLogger()
     logger.addHandler(handler)
-    logging.info('\n<============================================================================>')
+    logging.info('\n<===============================================================>')
     logging.info(f'\nApplication path: {application_path}')
     logging.info(f'\nCurrent working directory: {os.getcwd()}')
     logging.info(f'\nApplication started ... ({time.ctime()})\n')
@@ -393,7 +393,7 @@ def main():
     elapsed = end - start
     logging.info(
         '\nApplication finished in {:.2f} seconds ... ({})\n'
-        '\n<============================================================================>\n\n'.format(
+        '\n<=============================================================>\n\n'.format(
             elapsed, time.ctime()))
 
 
