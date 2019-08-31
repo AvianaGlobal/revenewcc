@@ -5,6 +5,7 @@ from gooey import Gooey, GooeyParser
 @Gooey(program_name='\nRevenewML\nSPR Report Scoring\n',
        dump_build_config=False,
        optional_cols=1,
+       default_size=(760, 540),
        # load_build_config='gooey_config.json',
        )
 def main():
@@ -69,7 +70,7 @@ def main():
     engine = create_engine(
         cnxn_str,
         fast_executemany=True,
-        echo=True,
+        echo=False,
         # implicit_returning=False,
         # isolation_level="AUTOCOMMIT",
     )
@@ -298,7 +299,7 @@ def main():
 
     # Set database table
     table_name = 'ModelScores'
-    df_output.to_sql(name=table_name, con=engine, if_exists='append', method='multi')
+    df_output.to_sql(name=table_name, con=engine, if_exists='append', method='multi', index_label='ID')
 
     # Stop timer
     end = timer()

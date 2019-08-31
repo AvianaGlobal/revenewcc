@@ -14,7 +14,7 @@ from gooey.util.functional import merge
 filenames = {
     'programIcon': 'program_icon.ico',
     'successIcon': 'success_icon.png',
-    'runningIcon': 'running_icon.png',
+    'runningIcon': 'AvianaLogo.png',
     'loadingIcon': 'loading_icon.gif',
     'configIcon': 'AvianaLogo.png',
     'errorIcon': 'error_icon.png'
