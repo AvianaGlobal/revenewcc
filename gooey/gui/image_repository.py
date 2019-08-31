@@ -20,7 +20,6 @@ filenames = {
     'errorIcon': 'AvianaLogo.png'
 }
 
-
 def loadImages(targetDir):
     defaultImages = resolvePaths(getResourcePath('images'), filenames)
     return {'images': merge(defaultImages, collectOverrides(targetDir, filenames))}
