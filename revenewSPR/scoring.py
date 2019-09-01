@@ -63,8 +63,10 @@ def main():
     user = 'sa'
     password = 'Aviana$92821'
     # database = 'RevenewSPRtest'
-    driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
-    cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+    # driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
+    # driver = "\"C:\\Windows\\System32\\sqlsrv32.dll\""
+    driver = '{SQL Server}'
+    # cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
 
     # Make database connection engine
     engine = create_engine(
