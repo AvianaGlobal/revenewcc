@@ -1,6 +1,6 @@
 {
   "language": "english",
-  "target": "\"C:\\Users\\mj\\Anaconda3\\python.exe\" -u \"C:\\Users\\mj\\revenewcc\\revenewCC\\ranking.py\"",
+  "target": "\"C:\\Users\\paulp\\Anaconda3\\python.exe\" -u \"c:\\datascience\\projects\\revenew\\revenewcc\\revenewCC\\ranking.py\"",
   "program_name": "\nRevenewML\nCC Supplier Ranking\n",
   "program_description": "",
   "sidebar_title": "Actions",
@@ -23,7 +23,7 @@
   "manual_start": false,
   "monospace_display": false,
   "image_dir": "::gooey/default",
-  "language_dir": "c:\\users\\mj\\revenewcc\\gooey\\languages",
+  "language_dir": "c:\\datascience\\projects\\revenew\\revenewcc\\gooey\\languages",
   "progress_regex": null,
   "progress_expr": null,
   "disable_progress_bar_animation": false,
