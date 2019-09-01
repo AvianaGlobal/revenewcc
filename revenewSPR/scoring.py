@@ -55,7 +55,6 @@ def main():
     application_path = os.getcwd()
 
     # Create connection strings
-    cnxn_str = f'mssql+pyodbc://@{dsn}/{database}'
 
     # Debug settings for database connection
     host = '208.43.250.18'
@@ -64,10 +63,10 @@ def main():
     password = 'Aviana$92821'
     # database = 'RevenewSPRtest'
     # driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
-    # driver = "\"C:\\Windows\\System32\\sqlsrv32.dll\""
-    driver = '{SQL Server}'
+    driver = "\"C:\\Windows\\System32\\sqlsrv32.dll\""
+    cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
     # cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-
+    print(f'\n\n{cnxn_str}\n\n')
     # Make database connection engine
     engine = create_engine(
         cnxn_str,

@@ -198,8 +198,8 @@ def main():
     user = 'sa'
     password = 'Aviana$92821'
     driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
-    cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    # cnxn_str = f'mssql+pyodbc://@{dsn}/{database}'
+    # cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+    cnxn_str = f'mssql+pyodbc://@{dsn}/{database}'
 
     # Make database connection engine
     engine = create_engine(
