@@ -45,7 +45,6 @@ class UnsupportedConfiguration(Exception):
     pass
 
 
-
 group_defaults = {
     'columns': 2,
     'padding': 10,
@@ -91,6 +90,7 @@ def process(parser, widget_dict, options):
 
     return categorize2(strip_empty(corrected_action_groups), widget_dict, options)
 
+
 def strip_empty(groups):
     return [group for group in groups if group['items']]
 
@@ -104,7 +104,7 @@ def assert_subparser_constraints(parser):
 
 
 def iter_parsers(parser):
-    ''' Iterate over name, parser pairs '''
+    """ Iterate over name, parser pairs """
     try:
         return get_subparser(parser._actions).choices.items()
     except:
@@ -112,10 +112,10 @@ def iter_parsers(parser):
 
 
 def extract_groups(action_group):
-    '''
+    """
     Recursively extract argument groups and associated actions
     from ParserGroup objects
-    '''
+    """
     return {
         'name': action_group.title,
         'description': action_group.description,
@@ -124,7 +124,7 @@ def extract_groups(action_group):
         'groups': [extract_groups(group)
                    for group in action_group._action_groups],
         'options': merge(group_defaults,
-                               getattr(action_group, 'gooey_options', {}))
+                         getattr(action_group, 'gooey_options', {}))
     }
 
 
@@ -136,14 +136,14 @@ def apply_default_rewrites(spec):
         contents = getin(spec, path)
         for group in contents:
             if group['name'] == 'positional arguments':
-                group['name'] = 'Required Arguments'
+                group['name'] = 'Data Sources'
             if group['name'] == 'optional arguments':
-                group['name'] = 'Optional Arguments'
+                group['name'] = 'Client Type'
     return spec
 
 
 def contains_actions(a, b):
-    ''' check if any actions(a) are present in actions(b) '''
+    """ check if any actions(a) are present in actions(b) """
     return set(a).intersection(set(b))
 
 
@@ -215,12 +215,12 @@ def get_widget(widgets, action, default):
 
 
 def is_required(action):
-    '''
+    """
     _actions possessing the `required` flag and not implicitly optional
     through `nargs` being '*' or '?'
-    '''
+    """
     return not isinstance(action, _SubParsersAction) and (
-    action.required == True and action.nargs not in ['*', '?'])
+            action.required == True and action.nargs not in ['*', '?'])
 
 
 def is_mutex(action):
@@ -244,15 +244,15 @@ def get_subparser(actions):
 
 
 def is_optional(action):
-    '''
+    """
     _actions either not possessing the `required` flag or implicitly optional
     through `nargs` being '*' or '?'
-    '''
+    """
     return (not action.required) or action.nargs in ['*', '?']
 
 
 def is_choice(action):
-    ''' action with choices supplied '''
+    """ action with choices supplied """
     return action.choices
 
 
@@ -295,18 +295,18 @@ def choose_name(name, subparser):
 
 
 def build_radio_group(mutex_group, widget_group, options):
-  return {
-    'id': str(uuid4()),
-    'type': 'RadioGroup',
-    'cli_type': 'optional',
-    'group_name': 'Choose Option',
-    'required': mutex_group.required,
-    'options': getattr(mutex_group, 'gooey_options', {}),
-    'data': {
-      'commands': [action.option_strings for action in mutex_group._group_actions],
-      'widgets': list(categorize(mutex_group._group_actions, widget_group, options))
+    return {
+        'id': str(uuid4()),
+        'type': 'RadioGroup',
+        'cli_type': 'optional',
+        'group_name': 'Choose Option',
+        'required': mutex_group.required,
+        'options': getattr(mutex_group, 'gooey_options', {}),
+        'data': {
+            'commands': [action.option_strings for action in mutex_group._group_actions],
+            'widgets': list(categorize(mutex_group._group_actions, widget_group, options))
+        }
     }
-  }
 
 
 def action_to_json(action, widget, options):
@@ -347,16 +347,17 @@ def action_to_json(action, widget, options):
 
 def choose_cli_type(action):
     return 'positional' \
-            if action.required and not action.option_strings \
-            else 'optional'
+        if action.required and not action.option_strings \
+        else 'optional'
+
 
 def clean_default(default):
-    '''
+    """
     Attemps to safely coalesce the default value down to
     a valid JSON type.
 
     See: Issue #147.
     function references supplied as arguments to the
     `default` parameter in Argparse cause errors in Gooey.
-    '''
+    """
     return default.__name__ if callable(default) else default

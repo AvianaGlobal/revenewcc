@@ -60,7 +60,6 @@ class GooeyMutuallyExclusiveGroup(_MutuallyExclusiveGroup):
         self.options[self.parser._actions[-1].dest] = options
 
 
-
 class GooeyParser(object):
     def __init__(self, **kwargs):
         self.__dict__['parser'] = ArgumentParser(**kwargs)
