@@ -222,12 +222,12 @@ def main():
     port = '51949'
     user = 'sa'
     password = 'Aviana$92821'
-    # database = 'Revenew_Anadarko2019'
+
     # driver = '/usr/local/lib/libmsodbcsql.13.dylib'
-    # cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    # cnxn_str = f'mssql+pyodbc://@{dsn}/{database}'
     driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
-    cnxn_str = f'mssql+pyodbc://@{dsn}'
+
+    # cnxn_str = f'mssql+pyodbc://@{dsn}'
+    cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
 
     # Make database connection engine
     engine = create_engine(
@@ -254,45 +254,35 @@ def main():
     print(commodity_df.sample(5))
 
     # # Read in the new client data
-    try:
-        if database is not None:
-            query = f"""
-            SELECT Supplier,
-                   datename(YEAR, Invoice_Date) AS Year,
-                   sum(Gross_Invoice_Amount) AS Total_Invoice_Amount,
-                   count(Invoice_Number) AS Total_Invoice_Count
-            FROM (
-                     SELECT DISTINCT ltrim(rtrim([Vendor Name])) AS Supplier,
-                                     [Invoice Date] AS Invoice_Date,
-                                     [Invoice Number] AS Invoice_Number,
-                                     [Gross Invoice Amount] AS Gross_Invoice_Amount
-                     FROM {database}.dbo.invoice
-                     WHERE [Vendor Name] IS NOT NULL
-                 ) t
-            GROUP BY Supplier, datename(YEAR, Invoice_Date)
-            ORDER BY Supplier, datename(YEAR, Invoice_Date)            
-                    """
-            input_df = pd.read_sql(query, engine)
-            input_df['Client'] = database
-        elif filename is not None:  # TODO Add data validation checks
-            # Expects: (Supplier, Total_Invoice_Amount, Total_Invoice_Count, Year)
-            input_df = pd.read_csv(filename, encoding='ISO-8859-1', sep='\t')
-            input_df['Supplier'] = input_df['Supplier'].astype(str)
-            input_df['Client'] = input_df['Client'].astype(str)
-        elif filename2 is not None:  # TODO Add data validation checks
-            # Expects: (Supplier, Total_Invoice_Amount, Total_Invoice_Count, Year)
-            input_df = pd.read_csv(filename2, encoding='ISO-8859-1', sep='\t')
-            input_df['Supplier'] = input_df['Supplier'].astype(str)
-            input_df['Client'] = input_df['Client'].astype(str)
-    except:
-        pass
-        # input_df = pd.DataFrame()
-
-    input_df.describe()
-
-    # Set client name based on database param
-
-    print(input_df.head(5))
+    if database is not None:
+        query = f"""
+        SELECT Supplier,
+               datename(YEAR, Invoice_Date) AS Year,
+               sum(Gross_Invoice_Amount) AS Total_Invoice_Amount,
+               count(Invoice_Number) AS Total_Invoice_Count
+        FROM (
+                 SELECT DISTINCT ltrim(rtrim([Vendor Name])) AS Supplier,
+                                 [Invoice Date] AS Invoice_Date,
+                                 [Invoice Number] AS Invoice_Number,
+                                 [Gross Invoice Amount] AS Gross_Invoice_Amount
+                 FROM {database}.dbo.invoice
+                 WHERE [Vendor Name] IS NOT NULL
+             ) t
+        GROUP BY Supplier, datename(YEAR, Invoice_Date)
+        ORDER BY Supplier, datename(YEAR, Invoice_Date)             
+                """
+        input_df = pd.read_sql(query, engine)
+        input_df['Client'] = database
+    elif filename is not None:  # TODO Add data validation checks
+        # Expects: (Supplier, Total_Invoice_Amount, Total_Invoice_Count, Year)
+        input_df = pd.read_csv(filename, encoding='ISO-8859-1', sep='\t')
+        input_df['Supplier'] = input_df['Supplier'].astype(str)
+        input_df['Client'] = input_df['Client'].astype(str)
+    elif filename2 is not None:  # TODO Add data validation checks
+        # Expects: (Supplier, Total_Invoice_Amount, Total_Invoice_Count, Year)
+        input_df = pd.read_csv(filename2, encoding='ISO-8859-1', sep='\t')
+        input_df['Supplier'] = input_df['Supplier'].astype(str)
+        input_df['Client'] = input_df['Client'].astype(str)
 
     # Data Processing Pipeline
 
@@ -395,7 +385,7 @@ def main():
     # In[340]:
 
     ####################################
-    # STEP 6: Aggregate to Client, Supplier, Year level.
+    # STEP 6: Aggregate to Client, Supplier, Year level. TODO Check this
     # Even if the raw data is at the invoice level, this makese sure that the data is rolled to supplier-year level
     input_df_with_ref = group_by_stats_list_sum(
         input_df_with_ref,
@@ -441,145 +431,178 @@ def main():
     input_df_with_ref["Commodity"] = input_df_with_ref["Commodity"].replace("CHEMICALS/ADDITIVES/INDUSTRIAL GAS",
                                                                             "SMALL_COUNT_COMM_GROUPS")
 
-    input_df_with_ref.head(5)
+    ###################################
+    # STEP 8: Scorecard computations
 
-    # Read in the scorecard  TODO migrate to MSSQL
+    ####################################
+    # STEP 8a: read in the scorecard TODO migrate to MSSQL
     print('\nCalculating supplier scores based on scorecard...')
     supplier_scorecard = pd.read_sql('select * from scorecard', con)
-    print(supplier_scorecard.sample(5))
 
-    # Do a full outer join with the scorecard
+    ####################################
+    # STEP 8b: do a full outer join with the scorecard
     input_df_with_ref['key'] = 1
     supplier_scorecard['key'] = 1
     input_df_with_ref_with_scorecard = pd.merge(input_df_with_ref, supplier_scorecard, on='key').drop('key', axis=1)
-    print(input_df_with_ref_with_scorecard.head(5))
 
-    # Get the Spend sub-dataframe
-    print('\nCalculating supplier spend score...')
+    ####################################
+    # STEP 8c-1: get the Spend sub-dataframe
     input_df_with_ref_with_scorecard_spend = (
         input_df_with_ref_with_scorecard.loc[input_df_with_ref_with_scorecard['Factor'] == 'Spend']).reset_index()
+
+    # find the matching record
     input_df_with_ref_with_scorecard_spend = (
         input_df_with_ref_with_scorecard_spend.loc[input_df_with_ref_with_scorecard_spend['Total_Invoice_Amount']
                                                    < input_df_with_ref_with_scorecard_spend['Max']])
+
     input_df_with_ref_with_scorecard_spend = (
         input_df_with_ref_with_scorecard_spend.loc[input_df_with_ref_with_scorecard_spend['Total_Invoice_Amount']
                                                    > input_df_with_ref_with_scorecard_spend['Min']])
-    input_df_with_ref_with_scorecard_spend = input_df_with_ref_with_scorecard_spend.reset_index()
-    print(input_df_with_ref_with_scorecard_spend.head(5))
 
-    # Get the InvoiceSize sub-dataframe
-    print('\nCalculating invoice size score...')
+    input_df_with_ref_with_scorecard_spend = input_df_with_ref_with_scorecard_spend.reset_index()
+
+    ####################################
+    # STEP 8c-2: #get the InvoiceSize sub-dataframe
     input_df_with_ref_with_scorecard_invoicesize = (
         input_df_with_ref_with_scorecard.loc[input_df_with_ref_with_scorecard['Factor'] == 'InvoiceSize']).reset_index()
+
+    # find the matching record
     input_df_with_ref_with_scorecard_invoicesize = (
         input_df_with_ref_with_scorecard_invoicesize.loc[
             input_df_with_ref_with_scorecard_invoicesize['Avg_Invoice_Size']
             < input_df_with_ref_with_scorecard_invoicesize['Max']])
+
     input_df_with_ref_with_scorecard_invoicesize = (
         input_df_with_ref_with_scorecard_invoicesize.loc[
             input_df_with_ref_with_scorecard_invoicesize['Avg_Invoice_Size']
             > input_df_with_ref_with_scorecard_invoicesize['Min']])
-    input_df_with_ref_with_scorecard_invoicesize = input_df_with_ref_with_scorecard_invoicesize.reset_index()
-    print(input_df_with_ref_with_scorecard_invoicesize.head(5))
 
-    # Get the InvoiceCount sub-dataframe
-    print('\nCalculating invoice count score...')
+    input_df_with_ref_with_scorecard_invoicesize = input_df_with_ref_with_scorecard_invoicesize.reset_index()
+
+    ####################################
+    # STEP 8c-3: #get the InvoiceCount sub-dataframe
     input_df_with_ref_with_scorecard_invoicecount = (
         input_df_with_ref_with_scorecard.loc[
             input_df_with_ref_with_scorecard['Factor'] == 'InvoiceCount']).reset_index()
+
+    # find the matching record
     input_df_with_ref_with_scorecard_invoicecount = (
         input_df_with_ref_with_scorecard_invoicecount.loc[
             input_df_with_ref_with_scorecard_invoicecount['Total_Invoice_Count']
             < input_df_with_ref_with_scorecard_invoicecount['Max']])
+
     input_df_with_ref_with_scorecard_invoicecount = (
         input_df_with_ref_with_scorecard_invoicecount.loc[
             input_df_with_ref_with_scorecard_invoicecount['Total_Invoice_Count']
             > input_df_with_ref_with_scorecard_invoicecount['Min']])
-    input_df_with_ref_with_scorecard_invoicecount = input_df_with_ref_with_scorecard_invoicecount.reset_index()
-    print(input_df_with_ref_with_scorecard_invoicecount.head(5))
 
-    # Get the Commodity sub-dataframe
-    print('\nCalculating commodity score...')
+    input_df_with_ref_with_scorecard_invoicecount = input_df_with_ref_with_scorecard_invoicecount.reset_index()
+
+    ####################################
+    # STEP 8c-4: get the Commodity sub-dataframe
     input_df_with_ref_with_scorecard_commodity = (
         input_df_with_ref_with_scorecard.loc[input_df_with_ref_with_scorecard['Factor'] == 'Commodity']).reset_index()
+
+    # find the matching record
     input_df_with_ref_with_scorecard_commodity = (
         input_df_with_ref_with_scorecard_commodity.loc[input_df_with_ref_with_scorecard_commodity['Commodity']
                                                        == input_df_with_ref_with_scorecard_commodity['Tier']])
-    input_df_with_ref_with_scorecard_commodity = input_df_with_ref_with_scorecard_commodity.reset_index()
-    print(input_df_with_ref_with_scorecard_commodity.head(5))
 
-    # Append all the factor scores
-    print('\nCombining factor scores...')
-    scores = (
-        input_df_with_ref_with_scorecard_spend.append(input_df_with_ref_with_scorecard_invoicesize, ignore_index=True)
-            .append(input_df_with_ref_with_scorecard_invoicecount, ignore_index=True)
-            .append(input_df_with_ref_with_scorecard_commodity, ignore_index=True))
+    input_df_with_ref_with_scorecard_commodity = input_df_with_ref_with_scorecard_commodity.reset_index()
+
+    ####################################
+    # STEP 8d: # append all the factor scores
+    scores = input_df_with_ref_with_scorecard_spend.append(input_df_with_ref_with_scorecard_invoicesize,
+                                                           ignore_index=True)
+    # scores=  scores.reset_index()
+    scores = scores.append(input_df_with_ref_with_scorecard_invoicecount, ignore_index=True)
+    # scores=  scores.reset_index()
+    scores = scores.append(input_df_with_ref_with_scorecard_commodity, ignore_index=True)
+    # scores=  scores.reset_index()
+
+    # score at supplier-year-factor-tier level
     component_scores = scores.copy()
-    scores = (group_by_stats_list_sum(scores,
-                                      ['Client', 'Supplier_ref', 'Year'],
-                                      ['Points']
-                                      )[['Client', 'Supplier_ref', 'Year', 'Points_Sum']])
+    # component_scores = scores[['Client', 'Supplier_ref', 'Year', 'Factor', 'Tier', 'Points']].copy()
+
+    # score at supplier-year level
+    scores = (group_by_stats_list_sum(scores, ['Client', 'Supplier_ref', 'Year'],
+                                      ['Points'])
+    [['Client', 'Supplier_ref', 'Year', 'Points_Sum']])
 
     print(f'\nHere are the factor scores:\n\n{scores}')
 
+    ####################################
     # STEP 9:  format in the way scorecard is currently implemented
 
     num_years = len(component_scores['Year'].unique())
     years = component_scores['Year'].unique()
+    years = np.sort(years)
 
-    yr_data_list = list()
+    Yr_data_List = list()
 
     i = 0
     while i < num_years:
-        yr = years[i]
-        yr_data = component_scores.loc[component_scores['Year'] == yr]
+        Yr = years[i]
+        Yr_data = component_scores.loc[component_scores['Year'] == Yr]
 
-        yr_data = (
-            group_by_stats_list_max(yr_data,
-                                    ['Client', 'Supplier_ref', 'Year'],
-                                    ['Total_Invoice_Amount', 'Total_Invoice_Count', 'Avg_Invoice_Size'])
-            [['Client', 'Supplier_ref', 'Year', 'Total_Invoice_Amount_Max',
-              'Total_Invoice_Count_Max', 'Avg_Invoice_Size_Max']])
+        Yr_data = (group_by_stats_list_max(Yr_data, ['Client', 'Supplier_ref', 'Year'],
+                                           ['Total_Invoice_Amount', 'Total_Invoice_Count', 'Avg_Invoice_Size'])
+        [['Client', 'Supplier_ref', 'Year', 'Total_Invoice_Amount_Max',
+          'Total_Invoice_Count_Max', 'Avg_Invoice_Size_Max']])
 
-        yr_data = (yr_data.rename
+        Yr_data = (Yr_data.rename
                    (columns={'Total_Invoice_Amount_Max': 'Total_Invoice_Amount',
                              'Total_Invoice_Count_Max': 'Total_Invoice_Count',
                              'Avg_Invoice_Size_Max': 'Avg_Invoice_Size'}))
 
-        yr_data_comm = (component_scores.loc[(component_scores['Year'] == yr)
+        Yr_data_comm = (component_scores.loc[(component_scores['Year'] == Yr)
                                              & (component_scores['Factor'] == "Commodity")]
         [['Client', 'Supplier_ref', 'Year', 'Original_Commodity']])
 
-        yr_data = pd.merge(yr_data, yr_data_comm, on=['Client', 'Supplier_ref', 'Year'])
+        Yr_data = pd.merge(Yr_data, Yr_data_comm, on=['Client', 'Supplier_ref', 'Year'])
 
-        yr_score_data = component_scores.loc[component_scores['Year'] == yr]
-        yr_data = pd.merge(yr_data, yr_score_data, on=['Client', 'Supplier_ref', 'Year'])
-        yr_data = yr_data[
+        Yr_score_data = scores.loc[scores['Year'] == Yr]
+        Yr_data = pd.merge(Yr_data, Yr_score_data, on=['Client', 'Supplier_ref', 'Year'])
+        Yr_data = Yr_data[
             ['Client', 'Supplier_ref', 'Original_Commodity', 'Total_Invoice_Amount', 'Total_Invoice_Count',
              'Avg_Invoice_Size', 'Points_Sum']]
-        yr_data = yr_data.rename(
+        Yr_data = Yr_data.rename(
             columns={'Client': 'Client',
-                     'Total_Invoice_Amount': str(int(yr)) + "_Total_Invoice_Amount",
-                     'Total_Invoice_Count': str(int(yr)) + "_Total_Invoice_Count",
-                     'Avg_Invoice_Size': str(int(yr)) + "_Avg_Invoice_Size",
-                     'Points_Sum': str(int(yr)) + "_Score"
+                     'Total_Invoice_Amount': str(int(Yr)) + "_Total_Invoice_Amount",
+                     'Total_Invoice_Count': str(int(Yr)) + "_Total_Invoice_Count",
+                     'Avg_Invoice_Size': str(int(Yr)) + "_Avg_Invoice_Size",
+                     'Points_Sum': str(int(Yr)) + "_Score"
                      })
 
-        yr_data_list.append(yr_data)
+        Yr_data_List.append(Yr_data)
         i = i + 1
 
-    final_data = yr_data_list[0]
+    final_data = Yr_data_List[0]
     i = 1
-    while i < len(yr_data_list):
-        final_data = (pd.merge(yr_data_list[i],
+    while i < len(Yr_data_List):
+        yr_df = Yr_data_List[i]
+        yr_df = yr_df.drop(['Original_Commodity'], axis=1)
+
+        final_data = (pd.merge(yr_df,
                                final_data, on=['Client', 'Supplier_ref']))
         i = i + 1
 
+    # rearrange
+    cols = list(final_data.columns.values)  # Make a list of all of the columns in the df
+    cols.pop(cols.index('Client'))
+    cols.pop(cols.index('Supplier_ref'))
+    cols.pop(cols.index('Original_Commodity'))
+    final_data = final_data[['Client', 'Supplier_ref',
+                             'Original_Commodity'] + cols]  # Create new dataframe with columns in the order you want
+
+    ####################################
     # STEP 10:  Write out all results into a spreadsheet
+
     # Create a Pandas Excel writer using XlsxWriter as the engine.
     writer = pd.ExcelWriter(
-        outputdir,
+        r"C:\\Users\\Satheesh\\DropboxElite\\Dropbox\\Projects\\Revenew\\ContractCompliance\\CC_Data\\StandardInputs\\CC_Audit_Scorecard.xlsx",
         engine='xlsxwriter')
+
     input_df.to_excel(writer, sheet_name='Raw_Data')
     matched.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers')
     unmatched.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers')
