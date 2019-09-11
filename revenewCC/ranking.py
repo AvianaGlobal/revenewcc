@@ -223,14 +223,11 @@ def main():
     user = 'sa'
     password = 'Aviana$92821'
     # database = 'Revenew_Anadarko2019'
-    driver = '/usr/local/lib/libmsodbcsql.13.dylib'
-    cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    # cnxn_str = f'mssql+pyodbc://@{dsn}/{database}'
-
-    driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
+    # driver = '/usr/local/lib/libmsodbcsql.13.dylib'
     # cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    cnxn_str = f'mssql+pyodbc://@{dsn}/{database}'
-
+    # cnxn_str = f'mssql+pyodbc://@{dsn}/{database}'
+    driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
+    cnxn_str = f'mssql+pyodbc://@{dsn}'
 
     # Make database connection engine
     engine = create_engine(
@@ -293,10 +290,7 @@ def main():
 
     input_df.describe()
 
-
     # Set client name based on database param
-
-
 
     print(input_df.head(5))
 
