@@ -67,8 +67,8 @@ def main():
     handler = logging.StreamHandler()
     logger = logging.getLogger()
     logger.addHandler(handler)
+    logging.info(f'\nApplication started ... ({time.ctime()})')
     logging.info(f'\nApplication path: {application_path}')
-    logging.info(f'\nApplication started ... ({time.ctime()})\n')
 
     # Step 0: Set up workspace
     import pandas as pd
@@ -126,7 +126,7 @@ def main():
 
     def group_by_stats_list_sum(df, group_by_cols, val_cols):
         overall_grouped_df = pd.DataFrame()
-        for i in tqdm(range(len(val_cols))):
+        for i in (range(len(val_cols))):
             grouped_df = (df.groupby(group_by_cols)
                           .agg({val_cols[i]: [np.sum]})
                           .rename(columns={'sum': val_cols[i] + '_Sum'}))
@@ -154,7 +154,7 @@ def main():
 
     def group_by_stats_list_max(df, group_by_cols, val_cols):
         overall_grouped_df = pd.DataFrame()
-        for i in tqdm(range(len(val_cols))):
+        for i in (range(len(val_cols))):
             grouped_df = (df.groupby(group_by_cols)
                           .agg({val_cols[i]: [np.max]})
                           .rename(columns={'amax': val_cols[i] + '_Max'}))
@@ -167,7 +167,7 @@ def main():
 
     def group_by_stats_list_min(df, group_by_cols, val_cols):
         overall_grouped_df = pd.DataFrame()
-        for i in tqdm(range(len(val_cols))):
+        for i in (range(len(val_cols))):
             grouped_df = (df.groupby(group_by_cols)
                           .agg({val_cols[i]: [np.min]})
                           .rename(columns={'amin': val_cols[i] + '_Min'}))
@@ -223,8 +223,8 @@ def main():
     user = 'sa'
     password = 'Aviana$92821'
 
-    # driver = '/usr/local/lib/libmsodbcsql.13.dylib'
-    driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
+    driver = '/usr/local/lib/libmsodbcsql.13.dylib'
+    # driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
 
     # cnxn_str = f'mssql+pyodbc://@{dsn}'
     cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
@@ -251,7 +251,7 @@ def main():
             on=['Supplier'], how='left'
         ).groupby(['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')
     )[['Supplier_ref', 'Commodity']]
-    print(commodity_df.sample(5))
+    # print(commodity_df.sample(5))
 
     # # Read in the new client data
     if database is not None:
@@ -309,7 +309,7 @@ def main():
 
     # first create a "cleaned" version of Unmatched_Supplier
     unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = unmatched_cross_ref['Unmatched_Supplier'].copy().astype(str)
-    unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = np.vectorize(clean_up_string)(
+    unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = np.vectorize(clean_up_string, otypes=[str])(
         unmatched_cross_ref['Unmatched_Supplier_Cleaned'])
 
     # In[335]:
@@ -322,7 +322,7 @@ def main():
     unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = unmatched_cross_ref['Unmatched_Supplier_Cleaned'].astype(str)
     unmatched_cross_ref['Supplier_ref'] = unmatched_cross_ref['Supplier_ref'].astype(str)
     # get the match ratio
-    unmatched_cross_ref['MatchRatio'] = np.vectorize(fuzz_ratio)(unmatched_cross_ref[name1], unmatched_cross_ref[name2])
+    unmatched_cross_ref['MatchRatio'] = np.vectorize(fuzz_ratio, otypes=[int])(unmatched_cross_ref[name1], unmatched_cross_ref[name2])
 
     # In[336]:
 
@@ -361,7 +361,7 @@ def main():
 
     no_soft_matches_full_join = pd.merge(no_soft_matches_1, no_soft_matches_2, on='key').drop('key', axis=1)
     no_soft_matches_full_join['MatchRatio'] = (
-        np.vectorize(fuzz_ratio)(no_soft_matches_full_join['Unmatched_Supplier'],
+        np.vectorize(fuzz_ratio, otypes=[int])(no_soft_matches_full_join['Unmatched_Supplier'],
                                  no_soft_matches_full_join['Unmatched_Supplier' + "_2"]))
 
     # pick close matches
@@ -529,7 +529,7 @@ def main():
                                       ['Points'])
     [['Client', 'Supplier_ref', 'Year', 'Points_Sum']])
 
-    print(f'\nHere are the factor scores:\n\n{scores}')
+    print(f'\nWriting output file to {outputdir}...')
 
     ####################################
     # STEP 9:  format in the way scorecard is currently implemented
@@ -600,7 +600,7 @@ def main():
 
     # Create a Pandas Excel writer using XlsxWriter as the engine.
     writer = pd.ExcelWriter(
-        r"C:\\Users\\Satheesh\\DropboxElite\\Dropbox\\Projects\\Revenew\\ContractCompliance\\CC_Data\\StandardInputs\\CC_Audit_Scorecard.xlsx",
+        f'{outputdir}/CC_Audit_Scorecard.xlsx',
         engine='xlsxwriter')
 
     input_df.to_excel(writer, sheet_name='Raw_Data')
@@ -612,18 +612,12 @@ def main():
     component_scores.to_excel(writer, sheet_name='Component_Scores')
     scores.to_excel(writer, sheet_name='SupplierScoreCard')
     final_data.to_excel(writer, sheet_name='FinalScorecard')
-
     writer.save()
 
     # Stop timer
     end = timer()
     elapsed = end - start
-
-    logging.info('\nApplication finished in {:.2f} seconds ... ({})'.format(elapsed, time.ctime()))
-
-    logging.info(
-        '\nApplication finished in {:.2f} seconds ... ({})\n'.format(
-            elapsed, time.ctime()))
+    logging.info('\nDONE!\n\nApplication finished in {:.2f} seconds ... ({})'.format(elapsed, time.ctime()))
 
 
 if __name__ == '__main__':
