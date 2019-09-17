@@ -5,6 +5,7 @@ __pycache__/
 build/
 dist/
 revenewCC/inputdata/
+venv/
 docs/
 \.DS_Store
 /**/*.pyc
