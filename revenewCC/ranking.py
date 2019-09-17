@@ -215,10 +215,10 @@ def main():
         return cleaned
 
     # Create database connection
-    host = '208.43.250.18'
-    port = '51949'
-    user = 'sa'
-    password = 'Aviana$92821'
+    # host = '208.43.250.18'
+    # port = '51949'
+    # user = 'sa'
+    # password = 'Aviana$92821'
 
     import os
     if os.name == 'nt':
@@ -228,13 +228,15 @@ def main():
         # for driver_name in drivers_list:
         #     print(driver_name)
     else:
-        # driver = '/usr/local/lib/libmsodbcsql.13.dylib'
-        # driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
-        # driver = '{OpenLink SQL Server Lite Driver v7.0}'
         driver = '/usr/local/lib/libmsodbcsql.13.dylib'
+        driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
+        driver = '/Library/ODBC/OpenLink SQL Server Lite ODBC Driver v8.0.bundle/Contents/MacOS/sql_mt_lt.so'
+        driver = '/Users/mj/Desktop/code/revenewcc/sql_mt_lt.so'
+
     # cnxn_str = f'mssql+pyodbc://@{dsn}'
+    cnxn_str = f'mssql+pyodbc://@{dsn}?driver={driver}'
     # cnxn_str = f'mssql+pyodbc://@{dsn}/{database}'
-    cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+    # cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
 
     # Make database connection engine
     from sqlalchemy import create_engine
@@ -254,9 +256,11 @@ def main():
     print('\nReading in supplier cross-reference files...')
 
     supplier_crossref_list = pd.read_sql('select Supplier, Supplier_ref from RevenewCC.dbo.crossref', engine)
-
+    # supplier_crossref_list = pd.to_sql('crossref', engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
+    
     commodity_list = pd.read_sql('select Supplier, Commodity from RevenewCC.dbo.commodities', engine)
-
+    # commodity_list.to_sql('commodities', engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
+    
     commodity_df = (
         pd.merge(
             supplier_crossref_list,
@@ -264,11 +268,10 @@ def main():
             on=['Supplier'], how='left'
         ).groupby(['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')
     )[['Supplier_ref', 'Commodity']]
+    
     # print(commodity_df.sample(5))
 
-    # commodity_list.to_sql('commodities', engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
-
-    # # Read in the new client data
+    # Read in the new client data
     if database is not None:
         query = f"""
         SELECT Supplier,
@@ -423,7 +426,7 @@ def main():
     ####################################
     # STEP 8: bring in the commodity
     input_df_with_ref = (pd.merge(input_df_with_ref,
-                                  commodity_df, on=['Supplier_ref'], how='left'))
+                                  commodity_df, on=['Supplier_ref'], how='left'))  # TODO investigate this join
     # fill_in when not available
     input_df_with_ref["Commodity"].fillna("NOT_AVAILABLE", inplace=True)
 
