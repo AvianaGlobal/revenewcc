@@ -10,12 +10,15 @@ setup(
     install_requires=[
         'Click',
         'pandas',
-        'SQLAlchemy',
+        'sqlalchemy',
         'tqdm',
         'fuzzywuzzy',
+        'Install python-Levenshtein',
         'gooey',
         'SHAP',
         'xgboost',
+        'xlsxwriter',
+        'pyodbc',
     ],
     entry_points='''
         [console_scripts]

@@ -241,12 +241,11 @@ def main():
     engine = create_engine(
         cnxn_str,
         fast_executemany=True,
-        echo=True,
+        echo=False,
         implicit_returning=False,
         isolation_level="AUTOCOMMIT",
     )
     engine.connect()
-
 
     # SQLite for testing and development
     con = sqlite3.connect('revenewML.db')
@@ -338,7 +337,8 @@ def main():
     unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = unmatched_cross_ref['Unmatched_Supplier_Cleaned'].astype(str)
     unmatched_cross_ref['Supplier_ref'] = unmatched_cross_ref['Supplier_ref'].astype(str)
     # get the match ratio
-    unmatched_cross_ref['MatchRatio'] = np.vectorize(fuzz_ratio, otypes=[int])(unmatched_cross_ref[name1], unmatched_cross_ref[name2])
+    unmatched_cross_ref['MatchRatio'] = np.vectorize(fuzz_ratio, otypes=[int])(unmatched_cross_ref[name1],
+                                                                               unmatched_cross_ref[name2])
 
     # In[336]:
 
@@ -378,7 +378,7 @@ def main():
     no_soft_matches_full_join = pd.merge(no_soft_matches_1, no_soft_matches_2, on='key').drop('key', axis=1)
     no_soft_matches_full_join['MatchRatio'] = (
         np.vectorize(fuzz_ratio, otypes=[int])(no_soft_matches_full_join['Unmatched_Supplier'],
-                                 no_soft_matches_full_join['Unmatched_Supplier' + "_2"]))
+                                               no_soft_matches_full_join['Unmatched_Supplier' + "_2"]))
 
     # pick close matches
     no_soft_matches_closematches = no_soft_matches_full_join.loc[(no_soft_matches_full_join['MatchRatio'] > 85)].copy()
@@ -453,7 +453,7 @@ def main():
     ####################################
     # STEP 8a: read in the scorecard
     print('\nCalculating supplier scores based on scorecard...')
-    supplier_scorecard = pd.read_sql('select * from scorecard', engine)
+    supplier_scorecard = pd.read_sql('select * from RevenewCC.dbo.scorecard', engine)
     supplier_scorecard.to_sql('scorecard', con=engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
     ####################################
     # STEP 8b: do a full outer join with the scorecard
