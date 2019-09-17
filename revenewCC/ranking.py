@@ -54,7 +54,6 @@ def main():
     import os
     import time
     import logging
-    import numpy as np
     from timeit import default_timer as timer
 
     # Get application path
@@ -68,7 +67,7 @@ def main():
     logger = logging.getLogger()
     logger.addHandler(handler)
     logging.info(f'\nApplication started ... ({time.ctime()})')
-    logging.info(f'\nApplication path: {application_path}')
+    logging.info(f'\nCurrent working directory: {application_path}')
 
     # Step 0: Set up workspace
     import pandas as pd
@@ -77,7 +76,6 @@ def main():
     import sqlite3
     import fuzzywuzzy
     import re
-    from tqdm import tqdm
 
     def lower_case(str_to_lc):
         if type(str_to_lc) == str:
@@ -217,41 +215,59 @@ def main():
         return cleaned
 
     # Create database connection
-    from sqlalchemy import create_engine
     host = '208.43.250.18'
     port = '51949'
     user = 'sa'
     password = 'Aviana$92821'
 
-    driver = '/usr/local/lib/libmsodbcsql.13.dylib'
-    # driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
-
+    import os
+    if os.name == 'nt':
+        driver = '{SQL Server}'
+        # import pypyodbc
+        # drivers_list = sorted(pypyodbc.drivers())
+        # for driver_name in drivers_list:
+        #     print(driver_name)
+    else:
+        # driver = '/usr/local/lib/libmsodbcsql.13.dylib'
+        # driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
+        # driver = '{OpenLink SQL Server Lite Driver v7.0}'
+        driver = '/usr/local/lib/libmsodbcsql.13.dylib'
     # cnxn_str = f'mssql+pyodbc://@{dsn}'
+    # cnxn_str = f'mssql+pyodbc://@{dsn}/{database}'
     cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
 
     # Make database connection engine
+    from sqlalchemy import create_engine
     engine = create_engine(
         cnxn_str,
         fast_executemany=True,
-        echo=False,
+        echo=True,
         implicit_returning=False,
         isolation_level="AUTOCOMMIT",
     )
+    engine.connect()
+
 
     # SQLite for testing and development
     con = sqlite3.connect('revenewML.db')
 
-    # Read in all Cross Reference Files TODO Make this a SQL server table
+    # Read in all Cross Reference Files
     print('\nReading in supplier cross-reference files...')
-    supplier_crossref_list = pd.read_sql('select Supplier, Supplier_ref from crossref', con)
+
+    supplier_crossref_list = pd.read_sql('select Supplier, Supplier_ref from RevenewCC.dbo.crossref', engine)
+
+    commodity_list = pd.read_sql('select Supplier, Commodity from RevenewCC.dbo.commodities', engine)
+
     commodity_df = (
         pd.merge(
-            pd.read_sql('select Supplier, Commodity from commodities', con),
-            pd.read_sql('select Supplier, Supplier_ref from crossref', con),
+            supplier_crossref_list,
+            commodity_list,
             on=['Supplier'], how='left'
         ).groupby(['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')
     )[['Supplier_ref', 'Commodity']]
     # print(commodity_df.sample(5))
+
+    # commodity_list.to_sql('commodities', engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
 
     # # Read in the new client data
     if database is not None:
@@ -435,10 +451,10 @@ def main():
     # STEP 8: Scorecard computations
 
     ####################################
-    # STEP 8a: read in the scorecard TODO migrate to MSSQL
+    # STEP 8a: read in the scorecard
     print('\nCalculating supplier scores based on scorecard...')
-    supplier_scorecard = pd.read_sql('select * from scorecard', con)
-
+    supplier_scorecard = pd.read_sql('select * from scorecard', engine)
+    supplier_scorecard.to_sql('scorecard', con=engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
     ####################################
     # STEP 8b: do a full outer join with the scorecard
     input_df_with_ref['key'] = 1

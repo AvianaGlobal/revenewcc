@@ -19,7 +19,6 @@ setup(
     ],
     entry_points='''
         [console_scripts]
-        rankcc=revenewCC.ranking:main
-        scorespr=revenewSPR.scoring:main
+        ranking=revenewCC.ranking:main
     ''',
 )
