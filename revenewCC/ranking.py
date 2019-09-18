@@ -214,38 +214,28 @@ def main():
         cleaned = strip(cleaned)
         return cleaned
 
-    # Create database connection
-    # host = '208.43.250.18'
-    # port = '51949'
-    # user = 'sa'
-    # password = 'Aviana$92821'
-
-    import os
-    if os.name == 'nt':
-        driver = '{SQL Server}'
-        # import pypyodbc
-        # drivers_list = sorted(pypyodbc.drivers())
-        # for driver_name in drivers_list:
-        #     print(driver_name)
-    else:
-        driver = '/usr/local/lib/libmsodbcsql.13.dylib'
-        driver = '/usr/local/Cellar/freetds/1.1.11/lib/libtdsodbc.0.so'
-        driver = '/Library/ODBC/OpenLink SQL Server Lite ODBC Driver v8.0.bundle/Contents/MacOS/sql_mt_lt.so'
-        driver = '/Users/mj/Desktop/code/revenewcc/sql_mt_lt.so'
+    # # Create database connection
+    user = 'sa'
+    password = 'Aviana$92821'
+    host = '208.43.250.18'
+    port = '51949'
+    database = "RevenewTest"
+    driver = "/usr/local/lib/libmsodbcsql.13.dylib"
+    # dsn = "cc"
 
     # cnxn_str = f'mssql+pyodbc://@{dsn}'
-    cnxn_str = f'mssql+pyodbc://@{dsn}?driver={driver}'
+    # cnxn_str = f'mssql+pyodbc://@{dsn}?driver={driver}'
     # cnxn_str = f'mssql+pyodbc://@{dsn}/{database}'
-    # cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+    cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
 
     # Make database connection engine
     from sqlalchemy import create_engine
     engine = create_engine(
         cnxn_str,
-        fast_executemany=True,
-        echo=False,
-        implicit_returning=False,
-        isolation_level="AUTOCOMMIT",
+        # fast_executemany=True,
+        # echo=False,
+        # implicit_returning=False,
+        # isolation_level="AUTOCOMMIT",
     )
     engine.connect()
 
@@ -457,7 +447,8 @@ def main():
     # STEP 8a: read in the scorecard
     print('\nCalculating supplier scores based on scorecard...')
     supplier_scorecard = pd.read_sql('select * from RevenewCC.dbo.scorecard', engine)
-    supplier_scorecard.to_sql('scorecard', con=engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
+    # supplier_scorecard.to_sql('scorecard', con=engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
+
     ####################################
     # STEP 8b: do a full outer join with the scorecard
     input_df_with_ref['key'] = 1
