@@ -13,7 +13,7 @@ setup(
         'sqlalchemy',
         'tqdm',
         'fuzzywuzzy',
-        'Install python-Levenshtein',
+        'python-Levenshtein',
         'gooey',
         'SHAP',
         'xgboost',
