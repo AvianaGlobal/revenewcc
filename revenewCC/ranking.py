@@ -244,7 +244,7 @@ def main():
         ).groupby(['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')
     )[['Supplier_ref', 'Commodity']]
     
-    # print(commodity_df.sample(5))
+    print(commodity_df.sample(5))
 
     # Read in the new client data
     if database is not None:
@@ -278,6 +278,7 @@ def main():
         input_df['Client'] = input_df['Client'].astype(str)
 
     # Data Processing Pipeline
+    print('\nPreparing data for analysis...')
 
     ####################################
     # STEP 3:  Merged and find direct matches
@@ -397,7 +398,7 @@ def main():
         'Total_Invoice_Count']
 
     # In[342]:
-
+    input_df_with_ref.head(5)
     ####################################
     # STEP 8: bring in the commodity
     input_df_with_ref = (pd.merge(input_df_with_ref,
@@ -424,6 +425,7 @@ def main():
                                                                             "SMALL_COUNT_COMM_GROUPS")
     input_df_with_ref["Commodity"] = input_df_with_ref["Commodity"].replace("CHEMICALS/ADDITIVES/INDUSTRIAL GAS",
                                                                             "SMALL_COUNT_COMM_GROUPS")
+    input_df_with_ref.head(5)
 
     ###################################
     # STEP 8: Scorecard computations
@@ -432,13 +434,15 @@ def main():
     # STEP 8a: read in the scorecard
     print('\nCalculating supplier scores based on scorecard...')
     supplier_scorecard = pd.read_sql('select * from RevenewCC.dbo.scorecard', engine)
+    supplier_scorecard.head(5)
+
     # supplier_scorecard.to_sql('scorecard', con=engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
     ####################################
     # STEP 8b: do a full outer join with the scorecard
     input_df_with_ref['key'] = 1
     supplier_scorecard['key'] = 1
     input_df_with_ref_with_scorecard = pd.merge(input_df_with_ref, supplier_scorecard, on='key').drop('key', axis=1)
-
+  
     ####################################
     # STEP 8c-1: get the Spend sub-dataframe
     input_df_with_ref_with_scorecard_spend = (
@@ -513,6 +517,7 @@ def main():
     # scores=  scores.reset_index()
     scores = scores.append(input_df_with_ref_with_scorecard_commodity, ignore_index=True)
     # scores=  scores.reset_index()
+    scores.head(5)
 
     # score at supplier-year-factor-tier level
     component_scores = scores.copy()
