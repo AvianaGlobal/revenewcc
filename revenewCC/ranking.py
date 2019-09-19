@@ -62,7 +62,7 @@ def main():
 
     # Set up logging
     start = timer()
-    log_file = application_path + '/../log.txt'
+    log_file = application_path + '/log.txt'
     logging.basicConfig(filename=log_file, level=logging.INFO)
     handler = logging.StreamHandler()
     logger = logging.getLogger()
@@ -232,12 +232,12 @@ def main():
     # Read in all Cross Reference Files
     print('\nLoading cross-reference tables...')
 
-    supplier_crossref_list = pd.read_sql('select Supplier, Supplier_ref from RevenewCC.dbo.crossref', engine)
-    # supplier_crossref_list = pd.to_sql('crossref', engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
+    supplier_crossref_list = pd.read_sql('select Supplier, Supplier_ref from Revenew.dbo.crossref', engine)
+    # supplier_crossref_list = pd.to_sql('crossref', engine, index=False, if_exists='replace', schema='Revenew.dbo')
 
-    commodity_list = pd.read_sql('select Supplier, Commodity from RevenewCC.dbo.commodities', engine)
-    # commodity_list.to_sql('commodities', engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
-
+    commodity_list = pd.read_sql('select Supplier, Commodity from Revenew.dbo.commodities', engine)
+    # commodity_list.to_sql('commodities', engine, index=False, if_exists='replace', schema='Revenew.dbo')
+  
     commodity_df = (
         pd.merge(
             supplier_crossref_list,
@@ -439,11 +439,10 @@ def main():
     ####################################ls
     # STEP 8a: read in the scorecard
     print('\nCalculating supplier scores based on scorecard...')
-    supplier_scorecard = pd.read_sql('select * from RevenewCC.dbo.scorecard', engine)
+    supplier_scorecard = pd.read_sql('select * from Revenew.dbo.scorecard', engine)
     supplier_scorecard.head(5)
 
-    # supplier_scorecard.to_sql('scorecard', con=engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
-
+    # supplier_scorecard.to_sql('scorecard', con=engine, index=False, if_exists='replace', schema='Revenew.dbo')
     ####################################
     # STEP 8b: do a full outer join with the scorecard
     input_df_with_ref['key'] = 1
