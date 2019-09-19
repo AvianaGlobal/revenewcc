@@ -15,8 +15,6 @@ setup(
         'fuzzywuzzy',
         'python-Levenshtein',
         'gooey',
-        'SHAP',
-        'xgboost',
         'xlsxwriter',
         'pyodbc',
     ],
