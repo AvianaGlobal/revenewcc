@@ -15,9 +15,9 @@ from gooey import Gooey, GooeyParser
     optional_cols=1,
     dump_build_config=False,
     load_build_config=None,
-    monospace_display=True,
+    # monospace_display=True,
     image_dir='::gooey/default',
-    language_dir='./gooey/languages',
+    language_dir='gooey/languages',
     progress_regex=None,
     progress_expr=None,
     disable_progress_bar_animation=False,
@@ -49,6 +49,7 @@ def main():
     filename = args.filename
     filename2 = args.filename2
     outputdir = args.outputdir
+    threshold = 85
 
     # Import packages
     import os
@@ -70,6 +71,7 @@ def main():
     logging.info(f'\nCurrent working directory: {application_path}')
 
     # Step 0: Set up workspace
+    print('\nSetting up workspace...')
     import pandas as pd
     import numpy as np
     import itertools
@@ -228,14 +230,14 @@ def main():
     engine.connect()
 
     # Read in all Cross Reference Files
-    print('\nReading in supplier cross-reference files...')
+    print('\nLoading cross-reference tables...')
 
     supplier_crossref_list = pd.read_sql('select Supplier, Supplier_ref from RevenewCC.dbo.crossref', engine)
     # supplier_crossref_list = pd.to_sql('crossref', engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
-    
+
     commodity_list = pd.read_sql('select Supplier, Commodity from RevenewCC.dbo.commodities', engine)
     # commodity_list.to_sql('commodities', engine, index=False, if_exists='replace', schema='RevenewCC.dbo')
-    
+  
     commodity_df = (
         pd.merge(
             supplier_crossref_list,
@@ -243,10 +245,10 @@ def main():
             on=['Supplier'], how='left'
         ).groupby(['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')
     )[['Supplier_ref', 'Commodity']]
-    
-    print(commodity_df.sample(5))
+    # print(commodity_df.sample(5))
 
     # Read in the new client data
+    print(f'\nLoading new client data...')
     if database is not None:
         query = f"""
         SELECT Supplier,
@@ -282,6 +284,7 @@ def main():
 
     ####################################
     # STEP 3:  Merged and find direct matches
+    print('\nNormalizing supplier names...')
     input_df_with_ref = (pd.merge(input_df, supplier_crossref_list, on='Supplier', how='left')
     [['Supplier', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year', 'Client', 'Supplier_ref']])
     matched = input_df_with_ref[
@@ -311,6 +314,7 @@ def main():
     ####################################
     # STEP 5b: Do the full softmatch, this will associate a MatchRatio to each possible match of Unmatched_Supplier_Cleaned & Supplier_Cleaned
     # doing on the cleaned up version
+    print('\nAttempting to soft-match the unmatched suppliers...')
     name1 = 'Unmatched_Supplier_Cleaned'
     name2 = 'Supplier_ref'
     unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = unmatched_cross_ref['Unmatched_Supplier_Cleaned'].astype(str)
@@ -330,7 +334,7 @@ def main():
 
     ####################################
     # STEP 5d: If > 85 match, then called matched
-    soft_matches = best_matches.loc[best_matches['MatchRatio'] > 85]
+    soft_matches = best_matches.loc[best_matches['MatchRatio'] > threshold]
     soft_matches = (
         soft_matches[['Unmatched_Supplier', 'Supplier_ref', 'MatchRatio']].rename(
             columns={'Unmatched_Supplier': 'Supplier'}))
@@ -341,7 +345,7 @@ def main():
 
     ####################################
     # STEP 5e: If <= 85 match, then called no soft matched
-    no_soft_matches = best_matches.loc[best_matches['MatchRatio'] <= 85][['Unmatched_Supplier']]
+    no_soft_matches = best_matches.loc[best_matches['MatchRatio'] <= threshold][['Unmatched_Supplier']]
 
     # In[339]:
 
@@ -378,10 +382,10 @@ def main():
     no_soft_matches_cross_ref = no_soft_matches_cross_ref.reset_index()
 
     # In[340]:
-
+    print('\nRolling up invoices to the Client-Supplier-Year level...')
     ####################################
-    # STEP 6: Aggregate to Client, Supplier, Year level. TODO Check this
-    # Even if the raw data is at the invoice level, this makese sure that the data is rolled to supplier-year level
+    # STEP 6: Aggregate to Client, Supplier, Year level.
+    # Even if the raw data is at the invoice level, this makes sure that the data is rolled to supplier-year level
     input_df_with_ref = group_by_stats_list_sum(
         input_df_with_ref,
         ['Client', 'Supplier_ref', 'Year'],
@@ -398,9 +402,11 @@ def main():
         'Total_Invoice_Count']
 
     # In[342]:
-    input_df_with_ref.head(5)
+    # input_df_with_ref.head(5)
     ####################################
     # STEP 8: bring in the commodity
+
+    print('\nAdding commodity type to supplier invoice data...')
     input_df_with_ref = (pd.merge(input_df_with_ref,
                                   commodity_df, on=['Supplier_ref'], how='left'))  # TODO investigate this join
     # fill_in when not available
@@ -430,7 +436,7 @@ def main():
     ###################################
     # STEP 8: Scorecard computations
 
-    ####################################
+    ####################################ls
     # STEP 8a: read in the scorecard
     print('\nCalculating supplier scores based on scorecard...')
     supplier_scorecard = pd.read_sql('select * from RevenewCC.dbo.scorecard', engine)
@@ -602,15 +608,15 @@ def main():
         f'{outputdir}/CC_Audit_Scorecard.xlsx',
         engine='xlsxwriter')
 
-    input_df.to_excel(writer, sheet_name='Raw_Data')
-    matched.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers')
-    unmatched.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers')
-    soft_matches.to_excel(writer, sheet_name='SoftMatched_Suppliers')
-    no_soft_matches.to_excel(writer, sheet_name='NoSoft_Matched_Supp')
-    no_soft_matches_cross_ref.to_excel(writer, sheet_name='NoSoft_Matched_Supp_Consol')
-    component_scores.to_excel(writer, sheet_name='Component_Scores')
-    scores.to_excel(writer, sheet_name='SupplierScoreCard')
-    final_data.to_excel(writer, sheet_name='FinalScorecard')
+    input_df.to_excel(writer, sheet_name='Raw_Data', index=False)
+    matched.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
+    unmatched.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
+    soft_matches.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
+    no_soft_matches.to_excel(writer, sheet_name='NoSoft_Matched_Supp', index=False)
+    no_soft_matches_cross_ref.to_excel(writer, sheet_name='NoSoft_Matched_Supp_Consol', index=False)
+    component_scores.to_excel(writer, sheet_name='Component_Scores', index=False)
+    scores.to_excel(writer, sheet_name='SupplierScoreCard', index=False)
+    final_data.to_excel(writer, sheet_name='FinalScorecard', index=False)
     writer.save()
 
     # Stop timer
