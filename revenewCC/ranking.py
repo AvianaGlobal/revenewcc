@@ -62,7 +62,7 @@ def main():
 
     # Set up logging
     start = timer()
-    log_file = application_path + '/../log.txt'
+    log_file = application_path + '/log.txt'
     logging.basicConfig(filename=log_file, level=logging.INFO)
     handler = logging.StreamHandler()
     logger = logging.getLogger()
