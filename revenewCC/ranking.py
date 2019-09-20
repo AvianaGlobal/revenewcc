@@ -218,26 +218,37 @@ def main():
 
     cnxn_str = f'mssql+pyodbc://@{dsn}'
 
+    import sys
+    if sys.platform == 'darwin':
+        # Debug settings for database connection
+        host = '208.43.250.18'
+        port = '51949'
+        user = 'sa'
+        password = 'Aviana$92821'
+        database = 'AvianaML'
+        driver = '/usr/local/lib/libmsodbcsql.13.dylib'
+        cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+
     # Make database connection engine
     from sqlalchemy import create_engine
     engine = create_engine(
         cnxn_str,
-        #fast_executemany=True,
-        #echo=False,
-        #implicit_returning=False,
-        #isolation_level="AUTOCOMMIT",
+        # fast_executemany=True,
+        # echo=False,
+        # implicit_returning=False,
+        # isolation_level="AUTOCOMMIT",
     )
     engine.connect()
 
     # Read in all Cross Reference Files
     print('\nLoading cross-reference tables...')
 
-    supplier_crossref_list = pd.read_sql('select Supplier, Supplier_ref from Revenew.dbo.crossref', engine)
+    supplier_crossref_list = pd.read_sql('SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref', engine)
     # supplier_crossref_list = pd.to_sql('crossref', engine, index=False, if_exists='replace', schema='Revenew.dbo')
 
-    commodity_list = pd.read_sql('select Supplier, Commodity from Revenew.dbo.commodities', engine)
+    commodity_list = pd.read_sql('SELECT Supplier, Commodity FROM Revenew.dbo.commodities', engine)
     # commodity_list.to_sql('commodities', engine, index=False, if_exists='replace', schema='Revenew.dbo')
-  
+
     commodity_df = (
         pd.merge(
             supplier_crossref_list,
@@ -439,7 +450,7 @@ def main():
     ####################################ls
     # STEP 8a: read in the scorecard
     print('\nCalculating supplier scores based on scorecard...')
-    supplier_scorecard = pd.read_sql('select * from Revenew.dbo.scorecard', engine)
+    supplier_scorecard = pd.read_sql('SELECT * FROM Revenew.dbo.scorecard', engine)
     supplier_scorecard.head(5)
 
     # supplier_scorecard.to_sql('scorecard', con=engine, index=False, if_exists='replace', schema='Revenew.dbo')

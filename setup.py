@@ -13,10 +13,10 @@ setup(
         'sqlalchemy',
         'tqdm',
         'fuzzywuzzy',
-        'python-Levenshtein',
         'gooey',
         'xlsxwriter',
         'pyodbc',
+        'wxpython',
     ],
     entry_points='''
         [console_scripts]
