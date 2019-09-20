@@ -1,31 +1,14 @@
 #!/usr/bin/env python
+import sys
+
 from gooey import Gooey, GooeyParser
 
 
 @Gooey(
-    advanced=True,
-    language='english',
-    auto_start=False,
-    target=None,
     program_name='\nRevenewML\nCC Supplier Ranking\n',
-    program_description=None,
     default_size=(760, 620),
-    use_legacy_titles=True,
-    required_cols=1,
-    optional_cols=1,
-    dump_build_config=False,
-    load_build_config=None,
-    # monospace_display=True,
     image_dir='::gooey/default',
     language_dir='gooey/languages',
-    progress_regex=None,
-    progress_expr=None,
-    disable_progress_bar_animation=False,
-    disable_stop_button=False,
-    group_by_type=False,
-    header_height=80,
-    navigation='SIDEBAR',
-    tabbed_groups=False,
 )
 def main():
     # Configure GUI
@@ -53,8 +36,11 @@ def main():
 
     # Import packages
     import os
+    import re
     import time
     import logging
+    import numpy as np
+    import pandas as pd
     from timeit import default_timer as timer
 
     # Get application path
@@ -72,12 +58,6 @@ def main():
 
     # Step 0: Set up workspace
     print('\nSetting up workspace...')
-    import pandas as pd
-    import numpy as np
-    import itertools
-    import sqlite3
-    import fuzzywuzzy
-    import re
 
     def lower_case(str_to_lc):
         if type(str_to_lc) == str:
@@ -95,17 +75,6 @@ def main():
         from fuzzywuzzy import fuzz
         return fuzz.ratio(str1, str2)
 
-    def cartesian(df1, df2):
-        rows = itertools.product(df1.iterrows(), df2.iterrows())
-        df = pd.DataFrame(left.append(right) for (_, left), (_, right) in rows)
-        return df.reset_index(drop=True)
-
-    def fuzz_partial_ratio(str1, str2):
-        return fuzzywuzzy.partial_ratio(str1, str2)
-
-    def fuzz_token_set_ratio(str1, str2):
-        return fuzzywuzzy.partial_ratio(str1, str2)
-
     def remove_stuff_within_paranthesis(str1):
         if type(str1) == str:
             cleaned = (re.sub(r" ?\([^)]+\)", "", str1))
@@ -120,10 +89,6 @@ def main():
         else:
             return str_to_clean
 
-    def strip_numbers(str1):
-        cleaned = re.sub('[0-9]+', '', str1)
-        return cleaned
-
     def group_by_stats_list_sum(df, group_by_cols, val_cols):
         overall_grouped_df = pd.DataFrame()
         for i in (range(len(val_cols))):
@@ -136,10 +101,6 @@ def main():
             else:
                 overall_grouped_df = pd.merge(overall_grouped_df, ret_df.reset_index(), on=group_by_cols)
         return overall_grouped_df
-
-    def group_by_count(df, group_by_cols):
-        grouped_df = df.groupby(group_by_cols).size().reset_index(name='Count')
-        return grouped_df
 
     def sel_distinct(df, group_by_cols, sort_col, desc):
         orig_group_by_cols = group_by_cols[:]
@@ -178,49 +139,36 @@ def main():
                 overall_grouped_df = pd.merge(overall_grouped_df, ret_df.reset_index(), on=group_by_cols, how='left')
         return overall_grouped_df
 
-    def get_string(str1, _from, _to):
-        end_from = str1.find(_from) + len(_from)
-        return str1[end_from: str1.find(_to, end_from)]
-
     def clean_up_string(inp_string):
-        cleaned = inp_string
-        # convert to lower case
-        if type(inp_string) == str:
-            cleaned = lower_case(inp_string)
-        # strip anything after dba
+        cleaned = lower_case(inp_string)
         cleaned = remove_substring_after_separator(cleaned, "dba")
-        # strip anything after "-"
-        remove_substring_after_separator(cleaned, "-")
-        # remove substrings within paranthesis
+        cleaned = remove_substring_after_separator(cleaned, "-")
         cleaned = remove_stuff_within_paranthesis(cleaned)
-        # clean up the lcase versions
         cleaned = strip(cleaned)
-        # standardize
-        cleaned = cleaned.replace('&', 'and')
-        cleaned = cleaned.replace('co.', '')
         cleaned = cleaned.replace('.', '')
         cleaned = cleaned.replace(',', '')
-        cleaned = cleaned.replace(' llc', '')
-        cleaned = cleaned.replace(' llp ', '')
-        cleaned = cleaned.replace('company', '')
-        cleaned = cleaned.replace('corporation', '')
-        cleaned = cleaned.replace(' inc', '')
-        cleaned = cleaned.replace(' ltd', '')
-        cleaned = cleaned.replace(' corp', '')
-        cleaned = cleaned.replace('pc', '')
+        cleaned = cleaned.replace('  ', ' ')
+        cleaned = cleaned.replace('&', 'and')
         cleaned = cleaned.replace('-', '')
         cleaned = cleaned.replace(')', '')
         cleaned = cleaned.replace('*', '')
         cleaned = cleaned.replace('@', '')
         cleaned = cleaned.replace('#', '')
-        cleaned = strip(cleaned)
+        cleaned = cleaned.replace('co', '')
+        cleaned = cleaned.replace('company', '')
+        cleaned = cleaned.replace('corp', '')
+        cleaned = cleaned.replace('corporation', '')
+        cleaned = cleaned.replace('inc', '')
+        cleaned = cleaned.replace('incorporated', '')
+        cleaned = cleaned.replace('ltd', '')
+        cleaned = cleaned.replace('limited', '')
+        cleaned = cleaned.replace('pc', '')
+        cleaned = cleaned.replace('llc', '')
+        cleaned = cleaned.replace('llp ', '')
         return cleaned
 
-    cnxn_str = f'mssql+pyodbc://@{dsn}'
-
-    import sys
+    # Work around macOS issues with ODBC
     if sys.platform == 'darwin':
-        # Debug settings for database connection
         host = '208.43.250.18'
         port = '51949'
         user = 'sa'
@@ -228,10 +176,12 @@ def main():
         database = 'AvianaML'
         driver = '/usr/local/lib/libmsodbcsql.13.dylib'
         cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+    else:
+        cnxn_str = f'mssql+pyodbc://@{dsn}' # Connection string assumes Windows auth
 
     # Make database connection engine
     from sqlalchemy import create_engine
-    engine = create_engine(
+    engine = create_engine(  # Options below are useful for debugging
         cnxn_str,
         # fast_executemany=True,
         # echo=False,
@@ -244,9 +194,11 @@ def main():
     print('\nLoading cross-reference tables...')
 
     supplier_crossref_list = pd.read_sql('SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref', engine)
+    # Use this in case you need to rewrite the table
     # supplier_crossref_list = pd.to_sql('crossref', engine, index=False, if_exists='replace', schema='Revenew.dbo')
 
     commodity_list = pd.read_sql('SELECT Supplier, Commodity FROM Revenew.dbo.commodities', engine)
+    # # Use this in case you need to rewrite the table
     # commodity_list.to_sql('commodities', engine, index=False, if_exists='replace', schema='Revenew.dbo')
 
     commodity_df = (
@@ -256,10 +208,11 @@ def main():
             on=['Supplier'], how='left'
         ).groupby(['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')
     )[['Supplier_ref', 'Commodity']]
-    # print(commodity_df.sample(5))
 
     # Read in the new client data
     print(f'\nLoading new client data...')
+
+    # Case 1: SPR Client
     if database is not None:
         query = f"""
         SELECT Supplier,
@@ -279,19 +232,39 @@ def main():
                 """
         input_df = pd.read_sql(query, engine)
         input_df['Client'] = database
-    elif filename is not None:  # TODO Add data validation checks
+
+    # Case 2: Non-SPR Client, Rolled Up
+    elif filename is not None:
         # Expects: (Supplier, Total_Invoice_Amount, Total_Invoice_Count, Year)
         input_df = pd.read_csv(filename, encoding='ISO-8859-1', sep='\t')
         input_df['Supplier'] = input_df['Supplier'].astype(str)
         input_df['Client'] = input_df['Client'].astype(str)
-    elif filename2 is not None:  # TODO Add data validation checks
-        # Expects: (Supplier, Total_Invoice_Amount, Total_Invoice_Count, Year)
+
+    # Case 3: Non-SPR Client, Raw
+    elif filename2 is not None:  # Fixme
+        # Expects: (Supplier, Invoice_Date, Gross_Invoice_Amount)
         input_df = pd.read_csv(filename2, encoding='ISO-8859-1', sep='\t')
         input_df['Supplier'] = input_df['Supplier'].astype(str)
         input_df['Client'] = input_df['Client'].astype(str)
 
     # Data Processing Pipeline
     print('\nPreparing data for analysis...')
+    input_df
+    ####################################
+    # STEP 6: Aggregate to Client, Supplier, Year level.
+    # Even if the raw data is at the invoice level, this makes sure that the data is rolled to supplier-year level
+    input_df_with_ref = group_by_stats_list_sum(
+        input_df_with_ref,
+        ['Client', 'Supplier_ref', 'Year'],
+        ['Total_Invoice_Amount', 'Total_Invoice_Count']
+    )[['Client', 'Supplier_ref', 'Year', 'Total_Invoice_Amount_Sum', 'Total_Invoice_Count_Sum']]
+
+    ####################################
+    # STEP 7:  Create new column Average Invoice Size
+    input_df_with_ref = input_df_with_ref.rename(columns={'Total_Invoice_Amount_Sum': 'Total_Invoice_Amount'})
+    input_df_with_ref = input_df_with_ref.rename(columns={'Total_Invoice_Count_Sum': 'Total_Invoice_Count'})
+    input_df_with_ref['Avg_Invoice_Size'] = input_df_with_ref['Total_Invoice_Amount'] / input_df_with_ref[
+        'Total_Invoice_Count']
 
     ####################################
     # STEP 3:  Merged and find direct matches
@@ -309,7 +282,6 @@ def main():
 
     ####################################
     # Step 5: Try to softmatch the unmatched
-
     # STEP 5a: First step is to create a full cross match of unmatched and supplier crossref
     unmatched['key'] = 1
     supplier_crossref_list['key'] = 1
@@ -319,8 +291,6 @@ def main():
     unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = unmatched_cross_ref['Unmatched_Supplier'].copy().astype(str)
     unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = np.vectorize(clean_up_string, otypes=[str])(
         unmatched_cross_ref['Unmatched_Supplier_Cleaned'])
-
-    # In[335]:
 
     ####################################
     # STEP 5b: Do the full softmatch, this will associate a MatchRatio to each possible match of Unmatched_Supplier_Cleaned & Supplier_Cleaned
@@ -334,14 +304,10 @@ def main():
     unmatched_cross_ref['MatchRatio'] = np.vectorize(fuzz_ratio, otypes=[int])(unmatched_cross_ref[name1],
                                                                                unmatched_cross_ref[name2])
 
-    # In[336]:
-
     ####################################
     # STEP 5c: Find the closest softmatch
     best_matches = sel_distinct(unmatched_cross_ref, ['Unmatched_Supplier'], ['MatchRatio'], 1)[
         ['Unmatched_Supplier', 'Supplier_ref', 'MatchRatio']]
-
-    # In[337]:
 
     ####################################
     # STEP 5d: If > 85 match, then called matched
@@ -352,13 +318,9 @@ def main():
     # update the input_df_with_ref with these new softmatches
     input_df_with_ref.update(soft_matches)
 
-    # In[338]:
-
     ####################################
     # STEP 5e: If <= 85 match, then called no soft matched
     no_soft_matches = best_matches.loc[best_matches['MatchRatio'] <= threshold][['Unmatched_Supplier']]
-
-    # In[339]:
 
     ####################################
     # STEP 5f: consolidate the no_soft_matches (as they might have duplicates)
@@ -392,28 +354,6 @@ def main():
 
     no_soft_matches_cross_ref = no_soft_matches_cross_ref.reset_index()
 
-    # In[340]:
-    print('\nRolling up invoices to the Client-Supplier-Year level...')
-    ####################################
-    # STEP 6: Aggregate to Client, Supplier, Year level.
-    # Even if the raw data is at the invoice level, this makes sure that the data is rolled to supplier-year level
-    input_df_with_ref = group_by_stats_list_sum(
-        input_df_with_ref,
-        ['Client', 'Supplier_ref', 'Year'],
-        ['Total_Invoice_Amount', 'Total_Invoice_Count']
-    )[['Client', 'Supplier_ref', 'Year', 'Total_Invoice_Amount_Sum', 'Total_Invoice_Count_Sum']]
-
-    # In[341]:
-
-    ####################################
-    # STEP 7:  Create new column Average Invoice Size
-    input_df_with_ref = input_df_with_ref.rename(columns={'Total_Invoice_Amount_Sum': 'Total_Invoice_Amount'})
-    input_df_with_ref = input_df_with_ref.rename(columns={'Total_Invoice_Count_Sum': 'Total_Invoice_Count'})
-    input_df_with_ref['Avg_Invoice_Size'] = input_df_with_ref['Total_Invoice_Amount'] / input_df_with_ref[
-        'Total_Invoice_Count']
-
-    # In[342]:
-    # input_df_with_ref.head(5)
     ####################################
     # STEP 8: bring in the commodity
 

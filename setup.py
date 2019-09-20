@@ -8,12 +8,9 @@ setup(
     include_package_data=True,
     install_dir=os.getcwd(),
     install_requires=[
-        'Click',
         'pandas',
         'sqlalchemy',
-        'tqdm',
         'fuzzywuzzy',
-        'gooey',
         'xlsxwriter',
         'pyodbc',
         'wxpython',
