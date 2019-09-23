@@ -13,19 +13,36 @@ from gooey import Gooey, GooeyParser
 def main():
     # Configure GUI
     parser = GooeyParser()
-    parser.add_argument('dsn', metavar='ODBC Data Source Name (DSN)',
-                        help='Please enter the DSN below', action='store')
+    parser.add_argument('dsn',
+                        metavar='ODBC Data Source Name (DSN)',
+                        help='Please enter the DSN below',
+                        action='store',)
     parser.add_argument('outputdir', metavar='Output Data Folder',
-                        help='Please select a target directory', action='store', widget='DirChooser')
-    grp = parser.add_mutually_exclusive_group(required=True, gooey_options={'show_border': True})
-    grp.add_argument('--database', metavar='SPR Client', widget='TextField',
-                     help='Please enter the client database name', action='store')
-    grp.add_argument('--filename', metavar='NonSPR Client - Rolled Up', widget='FileChooser',
+                        help='Please select a target directory',
+                        action='store',
+                        widget='DirChooser')
+    parser.add_argument('clientname', metavar='CC Client Name',
+                        help='Please enter the client\'s name below',
+                        action='store',)
+    grp = parser.add_mutually_exclusive_group(required=True,
+                                              gooey_options={'show_border': True})
+    grp.add_argument('--database',
+                     metavar='SPR Client',
+                     widget='TextField',
+                     help='Please enter the client database name',
+                     action='store',)
+    grp.add_argument('--filename',
+                     metavar='NonSPR Client - Rolled Up',
+                     widget='FileChooser',
                      help='CSV file '
-                          '[Columns: Supplier, Year, Total_Invoice_Amount, Total_Invoice_Count]', action='store')
-    grp.add_argument('--filename2', metavar='NonSPR Client - Not Rolled Up', widget='FileChooser',
+                          '[Columns: Client, Supplier, Year, Total_Invoice_Amount, Total_Invoice_Count]',
+                     action='store',)
+    grp.add_argument('--filename2',
+                     metavar='NonSPR Client - Raw',
+                     widget='FileChooser',
                      help='CSV file '
-                          '[Columns: Supplier, Invoice_Date, Gross_Invoice_Amount]', action='store')
+                          '[Columns: Client, Supplier, Invoice_Date, Gross_Invoice_Amount]',
+                     action='store',)
     args = parser.parse_args()
     dsn = args.dsn
     database = args.database
@@ -154,14 +171,14 @@ def main():
         cleaned = cleaned.replace('*', '')
         cleaned = cleaned.replace('@', '')
         cleaned = cleaned.replace('#', '')
+        cleaned = cleaned.replace('company', 'co')
+        cleaned = cleaned.replace('corporation', 'corp')
+        cleaned = cleaned.replace('incorporated', 'inc')
+        cleaned = cleaned.replace('limited', 'ltd')
         cleaned = cleaned.replace('co', '')
-        cleaned = cleaned.replace('company', '')
         cleaned = cleaned.replace('corp', '')
-        cleaned = cleaned.replace('corporation', '')
         cleaned = cleaned.replace('inc', '')
-        cleaned = cleaned.replace('incorporated', '')
         cleaned = cleaned.replace('ltd', '')
-        cleaned = cleaned.replace('limited', '')
         cleaned = cleaned.replace('pc', '')
         cleaned = cleaned.replace('llc', '')
         cleaned = cleaned.replace('llp ', '')
@@ -237,15 +254,15 @@ def main():
     elif filename is not None:
         # Expects: (Supplier, Total_Invoice_Amount, Total_Invoice_Count, Year)
         input_df = pd.read_csv(filename, encoding='ISO-8859-1', sep='\t')
-        input_df['Supplier'] = input_df['Supplier'].astype(str)
         input_df['Client'] = input_df['Client'].astype(str)
+        input_df['Supplier'] = input_df['Supplier'].astype(str)
 
     # Case 3: Non-SPR Client, Raw
     elif filename2 is not None:  # Fixme
         # Expects: (Supplier, Invoice_Date, Gross_Invoice_Amount)
         input_df = pd.read_csv(filename2, encoding='ISO-8859-1', sep='\t')
-        input_df['Supplier'] = input_df['Supplier'].astype(str)
         input_df['Client'] = input_df['Client'].astype(str)
+        input_df['Supplier'] = input_df['Supplier'].astype(str)
 
     # Data Processing Pipeline
     print('\nPreparing data for analysis...')
