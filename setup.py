@@ -3,7 +3,7 @@ import os
 
 setup(
     name='revenewCC',
-    version='0.1',
+    version='0.2',
     packages=find_packages(),
     include_package_data=True,
     install_dir=os.getcwd(),
@@ -15,8 +15,7 @@ setup(
         'pyodbc',
         'wxpython',
     ],
-    entry_points='''
-        [console_scripts]
-        ranking=revenewCC.ranking:main
-    ''',
+    entry_points={
+        'console_scripts': ['ranking=revenewCC.ranking:main']
+    }
 )

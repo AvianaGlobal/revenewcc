@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 import sys
-
 from gooey import Gooey, GooeyParser
 
 
 @Gooey(
     program_name='\nRevenewML\nCC Supplier Ranking\n',
-    default_size=(760, 620),
+    default_size=(700, 700),
     image_dir='::gooey/default',
     language_dir='gooey/languages',
 )
@@ -16,33 +15,33 @@ def main():
     parser.add_argument('dsn',
                         metavar='ODBC Data Source Name (DSN)',
                         help='Please enter the DSN below',
-                        action='store',)
+                        action='store', )
+    parser.add_argument('clientname', metavar='CC Client Name',
+                        help='Please enter the client\'s name below',
+                        action='store', )
     parser.add_argument('outputdir', metavar='Output Data Folder',
                         help='Please select a target directory',
                         action='store',
                         widget='DirChooser')
-    parser.add_argument('clientname', metavar='CC Client Name',
-                        help='Please enter the client\'s name below',
-                        action='store',)
     grp = parser.add_mutually_exclusive_group(required=True,
                                               gooey_options={'show_border': True})
     grp.add_argument('--database',
                      metavar='SPR Client',
                      widget='TextField',
                      help='Please enter the client database name',
-                     action='store',)
+                     action='store', )
     grp.add_argument('--filename',
                      metavar='NonSPR Client - Rolled Up',
                      widget='FileChooser',
                      help='CSV file '
                           '[Columns: Client, Supplier, Year, Total_Invoice_Amount, Total_Invoice_Count]',
-                     action='store',)
+                     action='store', )
     grp.add_argument('--filename2',
                      metavar='NonSPR Client - Raw',
                      widget='FileChooser',
                      help='CSV file '
                           '[Columns: Client, Supplier, Invoice_Date, Gross_Invoice_Amount]',
-                     action='store',)
+                     action='store', )
     args = parser.parse_args()
     dsn = args.dsn
     clientname = args.clientname
@@ -75,7 +74,7 @@ def main():
     logging.info(f'\nCurrent working directory: {application_path}')
 
     # Step 0: Set up workspace
-    print('\nSetting up workspace...')
+    logging.info('\nSetting up workspace...')
 
     def lower_case(str_to_lc):
         if type(str_to_lc) == str:
@@ -195,7 +194,7 @@ def main():
         driver = '/usr/local/lib/libmsodbcsql.13.dylib'
         cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
     else:
-        cnxn_str = f'mssql+pyodbc://@{dsn}' # Connection string assumes Windows auth
+        cnxn_str = f'mssql+pyodbc://@{dsn}'  # Connection string assumes Windows auth
 
     # Make database connection engine
     from sqlalchemy import create_engine
@@ -209,7 +208,7 @@ def main():
     engine.connect()
 
     # Read in all Cross Reference Files
-    print('\nLoading cross-reference tables...')
+    logging.info('\nLoading cross-reference tables...')
 
     supplier_crossref_list = pd.read_sql('SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref', engine)
     # Use this in case you need to rewrite the table
@@ -228,7 +227,7 @@ def main():
     )[['Supplier_ref', 'Commodity']]
 
     # Read in the new client data
-    print(f'\nLoading new client data...')
+    logging.info(f'\nLoading new client data...')
 
     # Case 1: SPR Client
     if database is not None:
@@ -253,24 +252,40 @@ def main():
 
     # Case 2: Non-SPR Client, Rolled Up
     elif filename is not None:
-        # Expects: (Supplier, Total_Invoice_Amount, Total_Invoice_Count, Year)
-        input_df = pd.read_csv(filename, encoding='ISO-8859-1', sep='\t')
-        input_df['Supplier'] = input_df['Supplier'].astype(str)
+        expected_columns = ['Supplier', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year']
+        input_df = pd.read_csv(filename, encoding='ISO-8859-1')
         input_df['Client'] = clientname
+        inlist = [col in input_df.columns for col in expected_columns]
+        if sum(inlist) != len(expected_columns):
+            missinglist = [col for col in expected_columns if col not in input_df.columns]
+            logging.info(f'The following columns were expected but not found: {missinglist}..')
+            raise Exception
 
     # Case 3: Non-SPR Client, Raw
-    elif filename2 is not None:  # Fixme
-        # Expects: (Supplier, Invoice_Date, Gross_Invoice_Amount)
-        input_df = pd.read_csv(filename2, encoding='ISO-8859-1', sep='\t')
-        input_df['Supplier'] = input_df['Supplier'].astype(str)
+    elif filename2 is not None:
+        expected_columns = ['Supplier', 'Invoice_Date', 'Gross_Invoice_Amount']
+        input_df = pd.read_csv(filename2, encoding='ISO-8859-1')
         input_df['Client'] = clientname
+        inlist = [col in input_df.columns for col in expected_columns]
+        if sum(inlist) != len(expected_columns):
+            missinglist = [col for col in expected_columns if col not in input_df.columns]
+            logging.info(f'The following columns were expected but not found: {missinglist}..')
+            raise Exception
 
-    # Data Processing Pipeline
-    print('\nPreparing data for analysis...')
-    input_df
+    # Validate input
+    else:
+        input_df = None
+    try:
+        input_df
+    except Exception:
+        logging.info('Something went wrong loading the new client data...')
+
+
     ####################################
+    # Data Processing Pipeline
+    logging.info('\nPreparing data for analysis...')
+
     # STEP 6: Aggregate to Client, Supplier, Year level.
-    # Even if the raw data is at the invoice level, this makes sure that the data is rolled to supplier-year level
     input_df_with_ref = group_by_stats_list_sum(
         input_df_with_ref,
         ['Client', 'Supplier_ref', 'Year'],
@@ -286,7 +301,7 @@ def main():
 
     ####################################
     # STEP 3:  Merged and find direct matches
-    print('\nNormalizing supplier names...')
+    logging.info('\nNormalizing supplier names...')
     input_df_with_ref = (pd.merge(input_df, supplier_crossref_list, on='Supplier', how='left')
     [['Supplier', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year', 'Client', 'Supplier_ref']])
     matched = input_df_with_ref[
@@ -313,7 +328,7 @@ def main():
     ####################################
     # STEP 5b: Do the full softmatch, this will associate a MatchRatio to each possible match of Unmatched_Supplier_Cleaned & Supplier_Cleaned
     # doing on the cleaned up version
-    print('\nAttempting to soft-match the unmatched suppliers...')
+    logging.info('\nAttempting to soft-match the unmatched suppliers...')
     name1 = 'Unmatched_Supplier_Cleaned'
     name2 = 'Supplier_ref'
     unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = unmatched_cross_ref['Unmatched_Supplier_Cleaned'].astype(str)
@@ -375,7 +390,7 @@ def main():
     ####################################
     # STEP 8: bring in the commodity
 
-    print('\nAdding commodity type to supplier invoice data...')
+    logging.info('\nAdding commodity type to supplier invoice data...')
     input_df_with_ref = (pd.merge(input_df_with_ref,
                                   commodity_df, on=['Supplier_ref'], how='left'))  # TODO investigate this join
     # fill_in when not available
@@ -407,7 +422,7 @@ def main():
 
     ####################################ls
     # STEP 8a: read in the scorecard
-    print('\nCalculating supplier scores based on scorecard...')
+    logging.info('\nCalculating supplier scores based on scorecard...')
     supplier_scorecard = pd.read_sql('SELECT * FROM Revenew.dbo.scorecard', engine)
     supplier_scorecard.head(5)
 
@@ -502,7 +517,7 @@ def main():
                                       ['Points'])
     [['Client', 'Supplier_ref', 'Year', 'Points_Sum']])
 
-    print(f'\nWriting output file to {outputdir}...')
+    logging.info(f'\nWriting output file to {outputdir}...')
 
     ####################################
     # STEP 9:  format in the way scorecard is currently implemented
