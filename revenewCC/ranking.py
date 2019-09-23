@@ -45,6 +45,7 @@ def main():
                      action='store',)
     args = parser.parse_args()
     dsn = args.dsn
+    clientname = args.clientname
     database = args.database
     filename = args.filename
     filename2 = args.filename2
@@ -248,21 +249,21 @@ def main():
         ORDER BY Supplier, datename(YEAR, Invoice_Date)             
                 """
         input_df = pd.read_sql(query, engine)
-        input_df['Client'] = database
+        input_df['Client'] = clientname
 
     # Case 2: Non-SPR Client, Rolled Up
     elif filename is not None:
         # Expects: (Supplier, Total_Invoice_Amount, Total_Invoice_Count, Year)
         input_df = pd.read_csv(filename, encoding='ISO-8859-1', sep='\t')
-        input_df['Client'] = input_df['Client'].astype(str)
         input_df['Supplier'] = input_df['Supplier'].astype(str)
+        input_df['Client'] = clientname
 
     # Case 3: Non-SPR Client, Raw
     elif filename2 is not None:  # Fixme
         # Expects: (Supplier, Invoice_Date, Gross_Invoice_Amount)
         input_df = pd.read_csv(filename2, encoding='ISO-8859-1', sep='\t')
-        input_df['Client'] = input_df['Client'].astype(str)
         input_df['Supplier'] = input_df['Supplier'].astype(str)
+        input_df['Client'] = clientname
 
     # Data Processing Pipeline
     print('\nPreparing data for analysis...')
