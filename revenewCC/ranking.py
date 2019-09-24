@@ -34,13 +34,13 @@ def main():
                      metavar='NonSPR Client - Rolled Up',
                      widget='FileChooser',
                      help='CSV file '
-                          '[Columns: Client, Supplier, Year, Total_Invoice_Amount, Total_Invoice_Count]',
+                          'Columns: Client, Supplier, Year, Total_Invoice_Amount, Total_Invoice_Count',
                      action='store', )
     grp.add_argument('--filename2',
                      metavar='NonSPR Client - Raw',
                      widget='FileChooser',
                      help='CSV file '
-                          '[Columns: Client, Supplier, Invoice_Date, Gross_Invoice_Amount]',
+                          'Columns: [Vendor Name], [Invoice Date], [Gross Invoice Amount]',
                      action='store', )
     args = parser.parse_args()
     dsn = args.dsn
@@ -200,8 +200,8 @@ def main():
     from sqlalchemy import create_engine
     engine = create_engine(  # Options below are useful for debugging
         cnxn_str,
-        # fast_executemany=True,
-        # echo=False,
+        fast_executemany=True,
+        echo=True,
         # implicit_returning=False,
         # isolation_level="AUTOCOMMIT",
     )
@@ -259,18 +259,18 @@ def main():
         if sum(inlist) != len(expected_columns):
             missinglist = [col for col in expected_columns if col not in input_df.columns]
             logging.info(f'The following columns were expected but not found: {missinglist}..')
-            raise Exception
+            raise SystemExit()
 
     # Case 3: Non-SPR Client, Raw
     elif filename2 is not None:
-        expected_columns = ['Supplier', 'Invoice_Date', 'Gross_Invoice_Amount']
-        input_df = pd.read_csv(filename2, encoding='ISO-8859-1')
+        expected_columns = ['Vendor Name', 'Invoice Date', 'Gross Invoice Amount']
+        input_df = pd.read_csv(filename2, encoding='ISO-8859-1', low_memory=False)
         input_df['Client'] = clientname
         inlist = [col in input_df.columns for col in expected_columns]
         if sum(inlist) != len(expected_columns):
             missinglist = [col for col in expected_columns if col not in input_df.columns]
             logging.info(f'The following columns were expected but not found: {missinglist}..')
-            raise Exception
+            raise SystemExit()
 
     # Validate input
     else:
@@ -279,23 +279,15 @@ def main():
         input_df
     except Exception:
         logging.info('Something went wrong loading the new client data...')
-
+        raise SystemExit()
 
     ####################################
     # Data Processing Pipeline
     logging.info('\nPreparing data for analysis...')
 
-    # STEP 6: Aggregate to Client, Supplier, Year level.
-    input_df_with_ref = group_by_stats_list_sum(
-        input_df_with_ref,
-        ['Client', 'Supplier_ref', 'Year'],
-        ['Total_Invoice_Amount', 'Total_Invoice_Count']
-    )[['Client', 'Supplier_ref', 'Year', 'Total_Invoice_Amount_Sum', 'Total_Invoice_Count_Sum']]
-
     ####################################
-    # STEP 7:  Create new column Average Invoice Size
-    input_df_with_ref = input_df_with_ref.rename(columns={'Total_Invoice_Amount_Sum': 'Total_Invoice_Amount'})
-    input_df_with_ref = input_df_with_ref.rename(columns={'Total_Invoice_Count_Sum': 'Total_Invoice_Count'})
+    # Create new column Average Invoice Size
+    input_df_with_ref = input_df.copy()
     input_df_with_ref['Avg_Invoice_Size'] = input_df_with_ref['Total_Invoice_Amount'] / input_df_with_ref[
         'Total_Invoice_Count']
 

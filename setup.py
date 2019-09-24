@@ -16,6 +16,8 @@ setup(
         'wxpython',
     ],
     entry_points={
-        'console_scripts': ['ranking=revenewCC.ranking:main']
+        'console_scripts': [
+            'ranking=revenewCC.ranking:main'
+        ]
     }
 )
