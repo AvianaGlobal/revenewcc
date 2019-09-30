@@ -1,3 +1,8 @@
+import pandas as pd
+import numpy as np
+from sqlalchemy import create_engine
+
+
 class Defaults:
     dsn = "cc"
     database = "RevenewTest"
@@ -14,13 +19,11 @@ class Defaults:
 
 
 def connectdb(cnxn_str):
-    from sqlalchemy import create_engine
-    engine = create_engine(cnxn_str, fast_executemany=True, echo=True,)
+    engine = create_engine(cnxn_str, fast_executemany=True, echo=True, )
     return engine.connect()
 
 
 def readfile(filename, clientname):
-    import pandas as pd
     input_df = pd.read_csv(filename, encoding='ISO-8859-1', low_memory=False)
     expected_columns = ['Vendor Name', 'Invoice Date', 'Gross Invoice Amount']
     input_df = input_df[expected_columns]

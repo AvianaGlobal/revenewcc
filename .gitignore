@@ -7,7 +7,9 @@ dist/
 revenewCC/inputdata/
 venv/
 docs/
+tests/
 \.DS_Store
 /**/*.pyc
 /**/*.parquet
 /**/*.txt
+/**/*.csv

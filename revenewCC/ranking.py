@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys
+import numpy as np
 from gooey import Gooey, GooeyParser
 
 
@@ -259,17 +260,22 @@ def main():
 
     # Case 3: Non-SPR Client, Raw
     elif filename2 is not None:
-        input_df = pd.read_csv(filename2, encoding='ISO-8859-1', low_memory=False)
+        temp_df = pd.read_csv(filename2, encoding='ISO-8859-1', low_memory=False)
         expected_columns = ['Vendor Name', 'Invoice Date', 'Gross Invoice Amount']
-        inlist = [col in input_df.columns for col in expected_columns]
+        inlist = [col in temp_df.columns for col in expected_columns]
         if sum(inlist) != len(expected_columns):
-            missinglist = [col for col in expected_columns if col not in input_df.columns]
+            missinglist = [col for col in expected_columns if col not in temp_df.columns]
             logging.info(f'The following columns were expected but not found: {missinglist}..')
             raise SystemExit()
-        input_df = input_df[expected_columns]
-        input_df['Client'] = clientname
-        input_df['Year'] = pd.to_datetime(input_df['Invoice Date']).dt.year
-        input_df.groupby('Year').agg({'Supplier': ['size'], 'Gross Invoice Amount': ['sum']})
+        temp_df = temp_df[expected_columns].rename(columns={'Vendor Name': 'Supplier', })
+        temp_df['Client'] = clientname
+        temp_df['Year'] = pd.to_datetime(temp_df['Invoice Date']).dt.year
+        sums = temp_df.groupby(['Supplier', 'Year'], as_index=False)['Gross Invoice Amount'].sum()
+        counts = temp_df.groupby(['Supplier', 'Year'], as_index=False)['Invoice Date'].agg(np.size)
+        input_df = pd \
+            .merge(sums, counts, on=['Supplier', 'Year']) \
+            .rename(columns={'Gross Invoice Amount': 'Total_Invoice_Amount',
+                             'Invoice Date': 'Total_Invoice_Count', })
 
     # Validate input
     else:
