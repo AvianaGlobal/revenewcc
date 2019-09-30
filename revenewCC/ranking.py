@@ -34,13 +34,13 @@ def main():
                      metavar='NonSPR Client - Rolled Up',
                      widget='FileChooser',
                      help='CSV file '
-                          'Columns: Client, Supplier, Year, Total_Invoice_Amount, Total_Invoice_Count',
+                          'Columns: "Client", "Supplier", "Year", "Total_Invoice_Amount", "Total_Invoice_Count"',
                      action='store', )
     grp.add_argument('--filename2',
                      metavar='NonSPR Client - Raw',
                      widget='FileChooser',
                      help='CSV file '
-                          'Columns: [Vendor Name], [Invoice Date], [Gross Invoice Amount]',
+                          'Columns: "Vendor Name", "Invoice Date", "Gross Invoice Amount"',
                      action='store', )
     args = parser.parse_args()
     dsn = args.dsn
@@ -218,13 +218,9 @@ def main():
     # # Use this in case you need to rewrite the table
     # commodity_list.to_sql('commodities', engine, index=False, if_exists='replace', schema='Revenew.dbo')
 
-    commodity_df = (
-        pd.merge(
-            supplier_crossref_list,
-            commodity_list,
-            on=['Supplier'], how='left'
-        ).groupby(['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')
-    )[['Supplier_ref', 'Commodity']]
+    commodity_df = (pd.merge(supplier_crossref_list, commodity_list, on=['Supplier'], how='left')
+                    .groupby(['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')
+                    )[['Supplier_ref', 'Commodity']]
 
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
@@ -252,25 +248,28 @@ def main():
 
     # Case 2: Non-SPR Client, Rolled Up
     elif filename is not None:
-        expected_columns = ['Supplier', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year']
         input_df = pd.read_csv(filename, encoding='ISO-8859-1')
-        input_df['Client'] = clientname
+        expected_columns = ['Supplier', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year']
         inlist = [col in input_df.columns for col in expected_columns]
         if sum(inlist) != len(expected_columns):
             missinglist = [col for col in expected_columns if col not in input_df.columns]
             logging.info(f'The following columns were expected but not found: {missinglist}..')
             raise SystemExit()
+        input_df['Client'] = clientname
 
     # Case 3: Non-SPR Client, Raw
     elif filename2 is not None:
-        expected_columns = ['Vendor Name', 'Invoice Date', 'Gross Invoice Amount']
         input_df = pd.read_csv(filename2, encoding='ISO-8859-1', low_memory=False)
-        input_df['Client'] = clientname
+        expected_columns = ['Vendor Name', 'Invoice Date', 'Gross Invoice Amount']
         inlist = [col in input_df.columns for col in expected_columns]
         if sum(inlist) != len(expected_columns):
             missinglist = [col for col in expected_columns if col not in input_df.columns]
             logging.info(f'The following columns were expected but not found: {missinglist}..')
             raise SystemExit()
+        input_df = input_df[expected_columns]
+        input_df['Client'] = clientname
+        input_df['Year'] = pd.to_datetime(input_df['Invoice Date']).dt.year
+        input_df.groupby('Year').agg({'Supplier': ['size'], 'Gross Invoice Amount': ['sum']})
 
     # Validate input
     else:
@@ -318,8 +317,7 @@ def main():
         unmatched_cross_ref['Unmatched_Supplier_Cleaned'])
 
     ####################################
-    # STEP 5b: Do the full softmatch, this will associate a MatchRatio to each possible match of Unmatched_Supplier_Cleaned & Supplier_Cleaned
-    # doing on the cleaned up version
+    # STEP 5b: Do the full softmatch, this will associate a MatchRatio to each possible match on the cleaned up version
     logging.info('\nAttempting to soft-match the unmatched suppliers...')
     name1 = 'Unmatched_Supplier_Cleaned'
     name2 = 'Supplier_ref'
@@ -410,22 +408,19 @@ def main():
     input_df_with_ref.head(5)
 
     ###################################
-    # STEP 8: Scorecard computations
+    # Scorecard computations
 
-    ####################################ls
     # STEP 8a: read in the scorecard
     logging.info('\nCalculating supplier scores based on scorecard...')
     supplier_scorecard = pd.read_sql('SELECT * FROM Revenew.dbo.scorecard', engine)
-    supplier_scorecard.head(5)
-
     # supplier_scorecard.to_sql('scorecard', con=engine, index=False, if_exists='replace', schema='Revenew.dbo')
-    ####################################
+    # supplier_scorecard.head(5)
+
     # STEP 8b: do a full outer join with the scorecard
     input_df_with_ref['key'] = 1
     supplier_scorecard['key'] = 1
     input_df_with_ref_with_scorecard = pd.merge(input_df_with_ref, supplier_scorecard, on='key').drop('key', axis=1)
 
-    ####################################
     # STEP 8c-1: get the Spend sub-dataframe
     input_df_with_ref_with_scorecard_spend = (
         input_df_with_ref_with_scorecard.loc[input_df_with_ref_with_scorecard['Factor'] == 'Spend']).reset_index()
@@ -441,7 +436,6 @@ def main():
 
     input_df_with_ref_with_scorecard_spend = input_df_with_ref_with_scorecard_spend.reset_index()
 
-    ####################################
     # STEP 8c-2: #get the InvoiceSize sub-dataframe
     input_df_with_ref_with_scorecard_invoicesize = (
         input_df_with_ref_with_scorecard.loc[input_df_with_ref_with_scorecard['Factor'] == 'InvoiceSize']).reset_index()
@@ -459,7 +453,6 @@ def main():
 
     input_df_with_ref_with_scorecard_invoicesize = input_df_with_ref_with_scorecard_invoicesize.reset_index()
 
-    ####################################
     # STEP 8c-3: #get the InvoiceCount sub-dataframe
     input_df_with_ref_with_scorecard_invoicecount = (
         input_df_with_ref_with_scorecard.loc[
@@ -478,7 +471,6 @@ def main():
 
     input_df_with_ref_with_scorecard_invoicecount = input_df_with_ref_with_scorecard_invoicecount.reset_index()
 
-    ####################################
     # STEP 8c-4: get the Commodity sub-dataframe
     input_df_with_ref_with_scorecard_commodity = (
         input_df_with_ref_with_scorecard.loc[input_df_with_ref_with_scorecard['Factor'] == 'Commodity']).reset_index()
@@ -490,7 +482,6 @@ def main():
 
     input_df_with_ref_with_scorecard_commodity = input_df_with_ref_with_scorecard_commodity.reset_index()
 
-    ####################################
     # STEP 8d: # append all the factor scores
     scores = input_df_with_ref_with_scorecard_spend.append(input_df_with_ref_with_scorecard_invoicesize,
                                                            ignore_index=True)
@@ -513,7 +504,6 @@ def main():
 
     ####################################
     # STEP 9:  format in the way scorecard is currently implemented
-
     num_years = len(component_scores['Year'].unique())
     years = component_scores['Year'].unique()
     years = np.sort(years)
@@ -577,7 +567,6 @@ def main():
 
     ####################################
     # STEP 10:  Write out all results into a spreadsheet
-
     # Create a Pandas Excel writer using XlsxWriter as the engine.
     writer = pd.ExcelWriter(
         f'{outputdir}/CC_Audit_Scorecard.xlsx',
