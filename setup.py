@@ -14,6 +14,7 @@ setup(
         'xlsxwriter',
         'pyodbc',
         'wxpython',
+        'python-Levenshtein',
     ],
     entry_points={
         'console_scripts': [

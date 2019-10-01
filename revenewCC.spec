@@ -6,7 +6,10 @@ block_cipher = None
 a = Analysis(['C:/DataScience/Projects/Revenew/revenewcc/revenewCC/ranking.py'],
              pathex=['C:\\DataScience\\Projects\\Revenew\\revenewcc'],
              binaries=[],
-             datas=[('C:/DataScience/Projects/Revenew/revenewcc/gooey/images', '.'), ('C:/DataScience/Projects/Revenew/revenewcc/gooey/images/AvianaLogo.png', '.'), ('C:/DataScience/Projects/Revenew/revenewcc/gooey/languages', '.')],
+             datas=[
+             ('C:/DataScience/Projects/Revenew/revenewcc/gooey/images', 'gooey/images'),
+             ('C:/DataScience/Projects/Revenew/revenewcc/gooey/images/AvianaLogo.png', 'gooey/images/AvianaLogo.png'),
+             ('C:/DataScience/Projects/Revenew/revenewcc/gooey/languages', 'gooey/languages')],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import sys
 from gooey import Gooey, GooeyParser
+from revenewCC.udfs import *
 
 
 @Gooey(
@@ -51,15 +52,17 @@ def main():
     outputdir = args.outputdir
     threshold = 85
 
+    ####################################
     # Import packages
     import os
-    import re
     import time
     import logging
     import numpy as np
     import pandas as pd
     from timeit import default_timer as timer
     from tqdm import tqdm
+
+    import revenewCC.dbconnect
 
     # Set up logging
     start = timer()
@@ -68,149 +71,25 @@ def main():
     handler = logging.StreamHandler()
     logger = logging.getLogger()
     logger.addHandler(handler)
+
+    # Print startup message
     logging.info(f'\nApplication started ... ({time.ctime()})')
     logging.info(f'\nCurrent working directory: {os.getcwd()}')
 
-    # Step 0: Set up workspace
     logging.info('\nSetting up workspace...')
-
-    def lower_case(str_to_lc):
-        if type(str_to_lc) == str:
-            return str_to_lc.lower()
-        else:
-            return str_to_lc
-
-    def strip(str_to_lc):
-        if type(str_to_lc) == str:
-            return str_to_lc.strip()
-        else:
-            return str_to_lc
-
-    def fuzz_ratio(str1, str2):
-        from fuzzywuzzy import fuzz
-        return fuzz.ratio(str1, str2)
-
-    def remove_stuff_within_paranthesis(str1):
-        if type(str1) == str:
-            cleaned = (re.sub(r" ?\([^)]+\)", "", str1))
-            return cleaned
-        else:
-            return str1
-
-    def remove_substring_after_separator(str_to_clean, separator):
-        if type(str_to_clean) == str:
-            cleaned = str_to_clean.split(separator, 1)[0]
-            return cleaned
-        else:
-            return str_to_clean
-
-    def group_by_stats_list_sum(df, group_by_cols, val_cols):
-        overall_grouped_df = pd.DataFrame()
-        for i in (range(len(val_cols))):
-            grouped_df = (df.groupby(group_by_cols)
-                          .agg({val_cols[i]: [np.sum]})
-                          .rename(columns={'sum': val_cols[i] + '_Sum'}))
-            ret_df = grouped_df[val_cols[i]].copy()
-            if i < 1:
-                overall_grouped_df = ret_df.reset_index()
-            else:
-                overall_grouped_df = pd.merge(overall_grouped_df, ret_df.reset_index(), on=group_by_cols)
-        return overall_grouped_df
-
-    def sel_distinct(df, group_by_cols, sort_col, desc):
-        orig_group_by_cols = group_by_cols[:]
-        if desc == 1:
-            group_by_cols.extend(sort_col)
-            sorted_df = df.sort_values(by=group_by_cols, ascending=False)
-        else:
-            group_by_cols.extend(sort_col)
-            sorted_df = df.sort_values(by=group_by_cols)
-        sorted_df_first_row = sorted_df.groupby(orig_group_by_cols).first().reset_index()
-        return sorted_df_first_row
-
-    def group_by_stats_list_max(df, group_by_cols, val_cols):
-        overall_grouped_df = pd.DataFrame()
-        for i in (range(len(val_cols))):
-            grouped_df = (df.groupby(group_by_cols)
-                          .agg({val_cols[i]: [np.max]})
-                          .rename(columns={'amax': val_cols[i] + '_Max'}))
-            ret_df = grouped_df[val_cols[i]]
-            if i < 1:
-                overall_grouped_df = ret_df.reset_index()
-            else:
-                overall_grouped_df = pd.merge(overall_grouped_df, ret_df.reset_index(), on=group_by_cols, how='left')
-        return overall_grouped_df
-
-    def group_by_stats_list_min(df, group_by_cols, val_cols):
-        overall_grouped_df = pd.DataFrame()
-        for i in (range(len(val_cols))):
-            grouped_df = (df.groupby(group_by_cols)
-                          .agg({val_cols[i]: [np.min]})
-                          .rename(columns={'amin': val_cols[i] + '_Min'}))
-            ret_df = grouped_df[val_cols[i]]
-            if i < 1:
-                overall_grouped_df = ret_df.reset_index()
-            else:
-                overall_grouped_df = pd.merge(overall_grouped_df, ret_df.reset_index(), on=group_by_cols, how='left')
-        return overall_grouped_df
-
-    def clean_up_string(inp_string):
-        cleaned = lower_case(inp_string)
-        cleaned = remove_substring_after_separator(cleaned, "dba")
-        cleaned = remove_substring_after_separator(cleaned, "-")
-        cleaned = remove_stuff_within_paranthesis(cleaned)
-        cleaned = strip(cleaned)
-        cleaned = cleaned.replace('.', '')
-        cleaned = cleaned.replace(',', '')
-        cleaned = cleaned.replace('  ', ' ')
-        cleaned = cleaned.replace('&', 'and')
-        cleaned = cleaned.replace('-', '')
-        cleaned = cleaned.replace(')', '')
-        cleaned = cleaned.replace('*', '')
-        cleaned = cleaned.replace('@', '')
-        cleaned = cleaned.replace('#', '')
-        cleaned = cleaned.replace('company', 'co')
-        cleaned = cleaned.replace('corporation', 'corp')
-        cleaned = cleaned.replace('incorporated', 'inc')
-        cleaned = cleaned.replace('limited', 'ltd')
-        # cleaned = cleaned.replace('co', '')
-        # cleaned = cleaned.replace('corp', '')
-        # cleaned = cleaned.replace('inc', '')
-        # cleaned = cleaned.replace('ltd', '')
-        # cleaned = cleaned.replace('pc', '')
-        # cleaned = cleaned.replace('llc', '')
-        # cleaned = cleaned.replace('llp ', '')
-        cleaned = cleaned.replace('"', '')
-        return cleaned
-
-    # Work around macOS issues with ODBC
-    if sys.platform == 'darwin':
-        host = '208.43.250.18'
-        port = '51949'
-        user = 'sa'
-        password = 'Aviana$92821'
-        database = 'AvianaML'
-        driver = '/usr/local/lib/libmsodbcsql.13.dylib'
-        cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    else:
-        cnxn_str = f'mssql+pyodbc://@{dsn}'  # Connection string assumes Windows auth
-
-    # Make database connection engine
-    from sqlalchemy import create_engine
-    engine = create_engine(  # Options below are useful for debugging
-        cnxn_str,
-        fast_executemany=True,
-        echo=False,
-        # implicit_returning=False,
-        # isolation_level="AUTOCOMMIT",
-    )
-    engine.connect()
+    engine = revenewCC.dbconnect.dbconnect()
+    # engine = revenewCC.dbconnect.sqliteconnect()
 
     # Read in all Cross Reference Files
     logging.info('\nLoading cross-reference tables...')
-    tqdm.pandas()
-    supplier_crossref_list = pd.read_sql('SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref', engine, chunksize=1)
-    supplier_crossref_list.progress_apply(lambda x: x, axis=1)
+    supplier_crossref_list = pd.DataFrame()
+    chunks = pd.read_sql('SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref', engine, chunksize=1)
+
+    for chunk in tqdm(chunks):
+        supplier_crossref_list.update(chunk)
+
+
+    supplier_crossref_list.progress_apply(lambda x: x in , axis=1)
     # [x.progress_apply for x in supplier_crossref_list]
 
     # Use this in case you need to rewrite the table
@@ -300,7 +179,7 @@ def main():
     suppliers = pd.DataFrame({'Supplier': input_df['Supplier'].unique()})
 
     logging.info('\nMatching supplier names against cross-reference file...')
-    input_df_with_ref = pd.merge(input_df, supplier_crossref_list, on='Supplier', how='left')
+    input_df_with_ref = pd.merge(suppliers, supplier_crossref_list, on='Supplier', how='left')
 
     logging.info('\nIdentifying non-matched suppliers...')
     unmatched = pd.DataFrame({
