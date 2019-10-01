@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import sys
-import numpy as np
 from gooey import Gooey, GooeyParser
 
 
@@ -60,19 +59,17 @@ def main():
     import numpy as np
     import pandas as pd
     from timeit import default_timer as timer
-
-    # Get application path
-    application_path = os.getcwd()
+    from tqdm import tqdm
 
     # Set up logging
     start = timer()
-    log_file = application_path + '/log.txt'
+    log_file = 'log.txt'
     logging.basicConfig(filename=log_file, level=logging.INFO)
     handler = logging.StreamHandler()
     logger = logging.getLogger()
     logger.addHandler(handler)
     logging.info(f'\nApplication started ... ({time.ctime()})')
-    logging.info(f'\nCurrent working directory: {application_path}')
+    logging.info(f'\nCurrent working directory: {os.getcwd()}')
 
     # Step 0: Set up workspace
     logging.info('\nSetting up workspace...')
@@ -176,13 +173,14 @@ def main():
         cleaned = cleaned.replace('corporation', 'corp')
         cleaned = cleaned.replace('incorporated', 'inc')
         cleaned = cleaned.replace('limited', 'ltd')
-        cleaned = cleaned.replace('co', '')
-        cleaned = cleaned.replace('corp', '')
-        cleaned = cleaned.replace('inc', '')
-        cleaned = cleaned.replace('ltd', '')
-        cleaned = cleaned.replace('pc', '')
-        cleaned = cleaned.replace('llc', '')
-        cleaned = cleaned.replace('llp ', '')
+        # cleaned = cleaned.replace('co', '')
+        # cleaned = cleaned.replace('corp', '')
+        # cleaned = cleaned.replace('inc', '')
+        # cleaned = cleaned.replace('ltd', '')
+        # cleaned = cleaned.replace('pc', '')
+        # cleaned = cleaned.replace('llc', '')
+        # cleaned = cleaned.replace('llp ', '')
+        cleaned = cleaned.replace('"', '')
         return cleaned
 
     # Work around macOS issues with ODBC
@@ -202,7 +200,7 @@ def main():
     engine = create_engine(  # Options below are useful for debugging
         cnxn_str,
         fast_executemany=True,
-        echo=True,
+        echo=False,
         # implicit_returning=False,
         # isolation_level="AUTOCOMMIT",
     )
@@ -210,12 +208,17 @@ def main():
 
     # Read in all Cross Reference Files
     logging.info('\nLoading cross-reference tables...')
+    tqdm.pandas()
+    supplier_crossref_list = pd.read_sql('SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref', engine, chunksize=1)
+    supplier_crossref_list.progress_apply(lambda x: x, axis=1)
+    # [x.progress_apply for x in supplier_crossref_list]
 
-    supplier_crossref_list = pd.read_sql('SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref', engine)
     # Use this in case you need to rewrite the table
     # supplier_crossref_list = pd.to_sql('crossref', engine, index=False, if_exists='replace', schema='Revenew.dbo')
 
-    commodity_list = pd.read_sql('SELECT Supplier, Commodity FROM Revenew.dbo.commodities', engine)
+    commodity_list = pd.read_sql('SELECT Supplier, Commodity FROM Revenew.dbo.commodities', engine, chunksize=10)
+    commodity_list.progress_apply(lambda x: x, axis=1)
+    # [x.progress_apply for x in commodity_list]
     # # Use this in case you need to rewrite the table
     # commodity_list.to_sql('commodities', engine, index=False, if_exists='replace', schema='Revenew.dbo')
 
@@ -289,49 +292,45 @@ def main():
     ####################################
     # Data Processing Pipeline
     logging.info('\nPreparing data for analysis...')
+    total = input_df['Total_Invoice_Amount']
+    count = input_df['Total_Invoice_Count']
+    input_df['Avg_Invoice_Size'] = total / count
 
-    ####################################
-    # Create new column Average Invoice Size
-    input_df_with_ref = input_df.copy()
-    input_df_with_ref['Avg_Invoice_Size'] = input_df_with_ref['Total_Invoice_Amount'] / input_df_with_ref[
-        'Total_Invoice_Count']
+    logging.info('\nCreating unique list of suppliers...')
+    suppliers = pd.DataFrame({'Supplier': input_df['Supplier'].unique()})
 
-    ####################################
-    # STEP 3:  Merged and find direct matches
-    logging.info('\nNormalizing supplier names...')
-    input_df_with_ref = (pd.merge(input_df, supplier_crossref_list, on='Supplier', how='left')
-    [['Supplier', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year', 'Client', 'Supplier_ref']])
-    matched = input_df_with_ref[
-        input_df_with_ref['Supplier_ref'].notnull()]  # has Supplier_ref added to the standard dataframe
+    logging.info('\nMatching supplier names against cross-reference file...')
+    input_df_with_ref = pd.merge(input_df, supplier_crossref_list, on='Supplier', how='left')
 
-    ####################################
-    # STEP 4:  what didnt find a match with the cross reference file
-    unmatched = input_df_with_ref[input_df_with_ref['Supplier_ref'].isnull()][['Supplier']]
+    logging.info('\nIdentifying non-matched suppliers...')
+    unmatched = pd.DataFrame({
+        'Supplier': input_df_with_ref[input_df_with_ref['Supplier_ref'].isnull()]['Supplier'].unique()})
     unmatched = unmatched.rename(columns={'Supplier': 'Unmatched_Supplier'}).reset_index()
     unmatched = unmatched.groupby(['Unmatched_Supplier']).size().reset_index(name='Freq')
 
-    ####################################
-    # Step 5: Try to softmatch the unmatched
-    # STEP 5a: First step is to create a full cross match of unmatched and supplier crossref
-    unmatched['key'] = 1
-    supplier_crossref_list['key'] = 1
-    unmatched_cross_ref = pd.merge(unmatched, supplier_crossref_list, on='key').drop('key', axis=1)
+    count_total = len(suppliers)
+    count_matched = len(input_df_with_ref[input_df_with_ref['Supplier_ref'].notnull()]['Supplier_ref'].unique())
+    count_unmatched = len(unmatched)
 
-    # first create a "cleaned" version of Unmatched_Supplier
-    unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = unmatched_cross_ref['Unmatched_Supplier'].copy().astype(str)
-    unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = np.vectorize(clean_up_string, otypes=[str])(
-        unmatched_cross_ref['Unmatched_Supplier_Cleaned'])
+    logging.info(f'\nTotal suppliers: {count_total}')
+    logging.info(f'Matched suppliers: {count_matched}')
+    logging.info(f'Unmatched suppliers: {count_unmatched}')
+    logging.info(f'\nTrying to soft-match the unmatched suppliers...')
 
-    ####################################
-    # STEP 5b: Do the full softmatch, this will associate a MatchRatio to each possible match on the cleaned up version
-    logging.info('\nAttempting to soft-match the unmatched suppliers...')
+    supplier_lookup = pd.DataFrame({'Supplier_ref': supplier_crossref_list['Supplier_ref'].unique()})
+    unmatched_cross_ref = pd.merge(unmatched, supplier_lookup, on='key').drop('key', axis=1)
+
+    # Create a cleaned version of Unmatched_Supplier
+    unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = [
+        clean_up_string(s) for s in tqdm(unmatched_cross_ref.Unmatched_Supplier)]
+
+    # Do the full softmatch, this will associate a MatchRatio to each possible match on the cleaned up version
+    logging.info('\nEvaluating soft-matching scores...')
     name1 = 'Unmatched_Supplier_Cleaned'
     name2 = 'Supplier_ref'
-    unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = unmatched_cross_ref['Unmatched_Supplier_Cleaned'].astype(str)
-    unmatched_cross_ref['Supplier_ref'] = unmatched_cross_ref['Supplier_ref'].astype(str)
-    # get the match ratio
-    unmatched_cross_ref['MatchRatio'] = np.vectorize(fuzz_ratio, otypes=[int])(unmatched_cross_ref[name1],
-                                                                               unmatched_cross_ref[name2])
+    series1 = unmatched_cross_ref[name1]
+    series2 = unmatched_cross_ref[name2]
+    unmatched_cross_ref['MatchRatio'] = [fuzz_ratio(s1, s2) for s1, s2 in tqdm(zip(series1, series2))]
 
     ####################################
     # STEP 5c: Find the closest softmatch
@@ -363,7 +362,7 @@ def main():
     no_soft_matches_full_join = pd.merge(no_soft_matches_1, no_soft_matches_2, on='key').drop('key', axis=1)
     no_soft_matches_full_join['MatchRatio'] = (
         np.vectorize(fuzz_ratio, otypes=[int])(no_soft_matches_full_join['Unmatched_Supplier'],
-                                               no_soft_matches_full_join['Unmatched_Supplier' + "_2"]))
+                                               no_soft_matches_full_join['Unmatched_Supplier' + "_2"]))  # fixme
 
     # pick close matches
     no_soft_matches_closematches = no_soft_matches_full_join.loc[(no_soft_matches_full_join['MatchRatio'] > 85)].copy()
@@ -411,7 +410,7 @@ def main():
                                                                             "SMALL_COUNT_COMM_GROUPS")
     input_df_with_ref["Commodity"] = input_df_with_ref["Commodity"].replace("CHEMICALS/ADDITIVES/INDUSTRIAL GAS",
                                                                             "SMALL_COUNT_COMM_GROUPS")
-    input_df_with_ref.head(5)
+    # input_df_with_ref.head(5)
 
     ###################################
     # Scorecard computations
