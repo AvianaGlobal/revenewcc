@@ -296,11 +296,8 @@ def main():
     # STEP 8d: # append all the factor scores
     scores = input_df_with_ref_with_scorecard_spend.append(input_df_with_ref_with_scorecard_invoicesize,
                                                            ignore_index=True)
-    # scores=  scores.reset_index()
     scores = scores.append(input_df_with_ref_with_scorecard_invoicecount, ignore_index=True)
-    # scores=  scores.reset_index()
     scores = scores.append(input_df_with_ref_with_scorecard_commodity, ignore_index=True)
-    # scores=  scores.reset_index()
 
     # score at supplier-year-factor-tier level
     component_scores = scores.copy()
