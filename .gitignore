@@ -4,7 +4,6 @@ __pycache__/
 \.ipynb_checkpoints/
 build/
 dist/
-revenewCC/inputdata/
 venv/
 docs/
 tests/
@@ -13,3 +12,4 @@ tests/
 /**/*.parquet
 /**/*.txt
 /**/*.csv
+/**/*.xlsx

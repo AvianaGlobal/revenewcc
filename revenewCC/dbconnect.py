@@ -15,10 +15,11 @@ else:
 
 
 def dbconnect():
+    # Monkey patch for macOS
     if runtype == 'Mac':
         cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
     else:
-        cnxn_str = f'mssql+pyodbc://@{dsn}'  # Connection string assumes Windows auth
+        cnxn_str = f'mssql+pyodbc://@{dsn}'
 
     # Make database connection engine
     from sqlalchemy import create_engine
@@ -36,4 +37,4 @@ def dbconnect():
 
 def sqliteconnect():
     import sqlite3
-    return sqlite3.connect('revenewCC.db')
+    return sqlite3.connect('revenewCC/inputdata/revenewCC.db')

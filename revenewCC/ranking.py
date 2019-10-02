@@ -1,7 +1,6 @@
 #!/usr/bin/env python
-import sys
 from gooey import Gooey, GooeyParser
-from revenewCC.udfs import *
+from revenewCC.helpers import *
 
 
 @Gooey(
@@ -53,16 +52,14 @@ def main():
     threshold = 85
 
     ####################################
-    # Import packages
+    # Top level imports
     import os
     import time
     import logging
     import numpy as np
     import pandas as pd
     from timeit import default_timer as timer
-    from tqdm import tqdm
-
-    import revenewCC.dbconnect
+    from tqdm.auto import tqdm
 
     # Set up logging
     start = timer()
@@ -72,35 +69,22 @@ def main():
     logger = logging.getLogger()
     logger.addHandler(handler)
 
-    # Print startup message
+    # Print startup messages
     logging.info(f'\nApplication started ... ({time.ctime()})')
     logging.info(f'\nCurrent working directory: {os.getcwd()}')
-
     logging.info('\nSetting up workspace...')
+
+    # Set up data connection
+    import revenewCC.dbconnect
+
     engine = revenewCC.dbconnect.dbconnect()
-    # engine = revenewCC.dbconnect.sqliteconnect()
 
     # Read in all Cross Reference Files
     logging.info('\nLoading cross-reference tables...')
-    supplier_crossref_list = pd.DataFrame()
-    chunks = pd.read_sql('SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref', engine, chunksize=1)
+    supplier_crossref_list = pd.read_pickle('revenewCC/inputdata/crossref.pkl')
+    commodity_list = pd.read_pickle('revenewCC/inputdata/crossref.pkl')
 
-    for chunk in tqdm(chunks):
-        supplier_crossref_list.update(chunk)
-
-
-    supplier_crossref_list.progress_apply(lambda x: x in , axis=1)
-    # [x.progress_apply for x in supplier_crossref_list]
-
-    # Use this in case you need to rewrite the table
-    # supplier_crossref_list = pd.to_sql('crossref', engine, index=False, if_exists='replace', schema='Revenew.dbo')
-
-    commodity_list = pd.read_sql('SELECT Supplier, Commodity FROM Revenew.dbo.commodities', engine, chunksize=10)
-    commodity_list.progress_apply(lambda x: x, axis=1)
-    # [x.progress_apply for x in commodity_list]
-    # # Use this in case you need to rewrite the table
-    # commodity_list.to_sql('commodities', engine, index=False, if_exists='replace', schema='Revenew.dbo')
-
+    # Merge crossref and commodities
     commodity_df = (pd.merge(supplier_crossref_list, commodity_list, on=['Supplier'], how='left')
                     .groupby(['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')
                     )[['Supplier_ref', 'Commodity']]
@@ -110,25 +94,8 @@ def main():
 
     # Case 1: SPR Client
     if database is not None:
-        query = f"""
-        SELECT Supplier,
-               datename(YEAR, Invoice_Date) AS Year,
-               sum(Gross_Invoice_Amount) AS Total_Invoice_Amount,
-               count(Invoice_Number) AS Total_Invoice_Count
-        FROM (
-                 SELECT DISTINCT ltrim(rtrim([Vendor Name])) AS Supplier,
-                                 [Invoice Date] AS Invoice_Date,
-                                 [Invoice Number] AS Invoice_Number,
-                                 [Gross Invoice Amount] AS Gross_Invoice_Amount
-                 FROM {database}.dbo.invoice
-                 WHERE [Vendor Name] IS NOT NULL
-             ) t
-        GROUP BY Supplier, datename(YEAR, Invoice_Date)
-        ORDER BY Supplier, datename(YEAR, Invoice_Date)             
-                """
-        input_df = pd.read_sql(query, engine)
-        input_df['Client'] = clientname
-
+        import revenewCC.cases
+        input_df = revenewCC.cases.input_spr(database, engine, clientname)
     # Case 2: Non-SPR Client, Rolled Up
     elif filename is not None:
         input_df = pd.read_csv(filename, encoding='ISO-8859-1')
@@ -139,7 +106,6 @@ def main():
             logging.info(f'The following columns were expected but not found: {missinglist}..')
             raise SystemExit()
         input_df['Client'] = clientname
-
     # Case 3: Non-SPR Client, Raw
     elif filename2 is not None:
         temp_df = pd.read_csv(filename2, encoding='ISO-8859-1', low_memory=False)
