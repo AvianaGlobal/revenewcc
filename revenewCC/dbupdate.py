@@ -38,3 +38,7 @@ commodity_list = pd.DataFrame()
 chunks = pd.read_sql(commquery, engine, chunksize=1)
 for chunk in tqdm(chunks, total=ncomm, dynamic_ncols=False):
     commodity_list = pd.concat([commodity_list, chunk])
+
+supplier_scorecard = pd.read_sql('SELECT * FROM Revenew.dbo.scorecard', engine)
+supplier_scorecard.to_sql('scorecard', con=engine, index=False, if_exists='replace', schema='Revenew.dbo')
+supplier_scorecard.to_pickle('revenewCC/inputdata/scorecard.pkl')

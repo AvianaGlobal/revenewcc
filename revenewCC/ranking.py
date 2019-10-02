@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-from gooey import Gooey, GooeyParser
-from revenewCC.helpers import *
+from gooey import Gooey
 
 
 @Gooey(
@@ -10,38 +9,8 @@ from revenewCC.helpers import *
     language_dir='gooey/languages',
 )
 def main():
-    # Configure GUI
-    parser = GooeyParser()
-    parser.add_argument('dsn',
-                        metavar='ODBC Data Source Name (DSN)',
-                        help='Please enter the DSN below',
-                        action='store', )
-    parser.add_argument('clientname', metavar='CC Client Name',
-                        help='Please enter the client\'s name below',
-                        action='store', )
-    parser.add_argument('outputdir', metavar='Output Data Folder',
-                        help='Please select a target directory',
-                        action='store',
-                        widget='DirChooser')
-    grp = parser.add_mutually_exclusive_group(required=True,
-                                              gooey_options={'show_border': True})
-    grp.add_argument('--database',
-                     metavar='SPR Client',
-                     widget='TextField',
-                     help='Please enter the client database name',
-                     action='store', )
-    grp.add_argument('--filename',
-                     metavar='NonSPR Client - Rolled Up',
-                     widget='FileChooser',
-                     help='CSV file '
-                          'Columns: "Client", "Supplier", "Year", "Total_Invoice_Amount", "Total_Invoice_Count"',
-                     action='store', )
-    grp.add_argument('--filename2',
-                     metavar='NonSPR Client - Raw',
-                     widget='FileChooser',
-                     help='CSV file '
-                          'Columns: "Vendor Name", "Invoice Date", "Gross Invoice Amount"',
-                     action='store', )
+    # Top level imports
+    from revenewCC.argparser import parser
     args = parser.parse_args()
     dsn = args.dsn
     clientname = args.clientname
@@ -49,17 +18,25 @@ def main():
     filename = args.filename
     filename2 = args.filename2
     outputdir = args.outputdir
-    threshold = 85
+    threshold = 89
 
-    ####################################
-    # Top level imports
+    import io
     import os
     import time
     import logging
     import numpy as np
     import pandas as pd
-    from timeit import default_timer as timer
+    from contextlib import redirect_stderr
     from tqdm.auto import tqdm
+    from fuzzywuzzy import fuzz
+    from timeit import default_timer as timer
+
+    from revenewCC import helpers
+    from revenewCC.dbconnect import dbconnect
+    from revenewCC.defaults import database, clientname, filename, filename2
+
+    # Set up data connection
+    engine = dbconnect()
 
     # Set up logging
     start = timer()
@@ -74,31 +51,90 @@ def main():
     logging.info(f'\nCurrent working directory: {os.getcwd()}')
     logging.info('\nSetting up workspace...')
 
-    # Set up data connection
-    import revenewCC.dbconnect
-
-    engine = revenewCC.dbconnect.dbconnect()
-
-    # Read in all Cross Reference Files
-    logging.info('\nLoading cross-reference tables...')
+    # Read in all Resource Files
     supplier_crossref_list = pd.read_pickle('revenewCC/inputdata/crossref.pkl')
-    commodity_list = pd.read_pickle('revenewCC/inputdata/crossref.pkl')
+    commodity_list = pd.read_pickle('revenewCC/inputdata/commodities.pkl')
+    supplier_scorecard = pd.read_pickle('revenewCC/inputdata/scorecard.pkl')
 
     # Merge crossref and commodities
-    commodity_df = (pd.merge(supplier_crossref_list, commodity_list, on=['Supplier'], how='left')
-                    .groupby(['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')
-                    )[['Supplier_ref', 'Commodity']]
+    commodity_df = pd \
+        .merge(supplier_crossref_list, commodity_list, on=['Supplier'], how='left') \
+        .groupby(['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')[['Supplier_ref', 'Commodity']]
+
+    # fill_in when not available
+    commodity_df["Commodity"].fillna("NOT_AVAILABLE", inplace=True)
+
+    # fill_in small value commodities with SMALL_COUNT_COMM_GROUPS
+    commodity_df["Commodity"].replace(
+        to_replace=[
+            "FACILITIES MAINTENANCE/SECURITY",
+            "REMOVE",
+            "STAFF AUGMENTATION",
+            "INSPECTION/MONITORING/LAB SERVICES",
+            "TELECOMMUNICATIONS",
+            "METER READING SERVICES",
+            "CHEMICALS/ADDITIVES/INDUSTRIAL GAS", ],
+        value="SMALL_COUNT_COMM_GROUPS", inplace=True)
 
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
 
     # Case 1: SPR Client
     if database is not None:
-        import revenewCC.cases
-        input_df = revenewCC.cases.input_spr(database, engine, clientname)
+        dataquery = f"""
+            SELECT Supplier,
+                   datename(YEAR, Invoice_Date) AS Year,
+                   sum(Gross_Invoice_Amount) AS Total_Invoice_Amount,
+                   count(Invoice_Number) AS Total_Invoice_Count
+            FROM (
+                     SELECT DISTINCT ltrim(rtrim([Vendor Name])) AS Supplier,
+                                     [Invoice Date] AS Invoice_Date,
+                                     [Invoice Number] AS Invoice_Number,
+                                     [Gross Invoice Amount] AS Gross_Invoice_Amount
+                     FROM {database}.dbo.invoice
+                     WHERE [Vendor Name] IS NOT NULL
+                 ) t
+            GROUP BY Supplier, datename(YEAR, Invoice_Date)
+            ORDER BY Supplier, datename(YEAR, Invoice_Date)             
+"""
+        countquery = f"""
+            WITH df as (SELECT Supplier,
+                   datename(YEAR, Invoice_Date) AS Year,
+                   sum(Gross_Invoice_Amount) AS Total_Invoice_Amount,
+                   count(Invoice_Number) AS Total_Invoice_Count
+            FROM (
+                     SELECT DISTINCT ltrim(rtrim([Vendor Name])) AS Supplier,
+                                     [Invoice Date] AS Invoice_Date,
+                                     [Invoice Number] AS Invoice_Number,
+                                     [Gross Invoice Amount] AS Gross_Invoice_Amount
+                     FROM {database}.dbo.invoice
+                     WHERE [Vendor Name] IS NOT NULL
+                 ) t
+            GROUP BY Supplier, datename(YEAR, Invoice_Date)) 
+            SELECT COUNT(*) as Count FROM df             
+"""
+        count = pd.read_sql(countquery, engine).values[0][0]
+        input_df = pd.DataFrame()
+        chunks = pd.read_sql(dataquery, engine, chunksize=1)
+        # f = io.StringIO()
+        # with redirect_stderr(f):
+        for chunk in tqdm(chunks, total=count):
+            input_df = pd.concat([input_df, chunk])
+            # prog = f.getvalue().split('\r ')[-1].strip()
+            # print(prog)
+            # time.sleep(0.2)
+        input_df['Client'] = clientname
     # Case 2: Non-SPR Client, Rolled Up
     elif filename is not None:
-        input_df = pd.read_csv(filename, encoding='ISO-8859-1')
+        input_df = pd.DataFrame()
+        chunks = pd.read_csv(filename, encoding='ISO-8859-1', low_memory=False, chunksize=1)
+        # f = io.StringIO()
+        # with redirect_stderr(f):
+        for chunk in tqdm(chunks):
+            input_df = pd.concat([input_df, chunk])
+            # prog = f.getvalue().split('\r ')[-1].strip()
+            # print(prog)
+            # time.sleep(0.2)
         expected_columns = ['Supplier', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year']
         inlist = [col in input_df.columns for col in expected_columns]
         if sum(inlist) != len(expected_columns):
@@ -108,7 +144,15 @@ def main():
         input_df['Client'] = clientname
     # Case 3: Non-SPR Client, Raw
     elif filename2 is not None:
-        temp_df = pd.read_csv(filename2, encoding='ISO-8859-1', low_memory=False)
+        temp_df = pd.DataFrame()
+        chunks = pd.read_csv(filename2, encoding='ISO-8859-1', low_memory=False, chunksize=1)
+        # f = io.StringIO()
+        # with redirect_stderr(f):
+        for chunk in tqdm(chunks):
+            input_df = pd.concat([input_df, chunk])
+            # prog = f.getvalue().split('\r ')[-1].strip()
+            # print(prog)
+            # time.sleep(0.2)
         expected_columns = ['Vendor Name', 'Invoice Date', 'Gross Invoice Amount']
         inlist = [col in temp_df.columns for col in expected_columns]
         if sum(inlist) != len(expected_columns):
@@ -116,7 +160,6 @@ def main():
             logging.info(f'The following columns were expected but not found: {missinglist}..')
             raise SystemExit()
         temp_df = temp_df[expected_columns].rename(columns={'Vendor Name': 'Supplier', })
-        temp_df['Client'] = clientname
         temp_df['Year'] = pd.to_datetime(temp_df['Invoice Date']).dt.year
         sums = temp_df.groupby(['Supplier', 'Year'], as_index=False)['Gross Invoice Amount'].sum()
         counts = temp_df.groupby(['Supplier', 'Year'], as_index=False)['Invoice Date'].agg(np.size)
@@ -124,152 +167,72 @@ def main():
             .merge(sums, counts, on=['Supplier', 'Year']) \
             .rename(columns={'Gross Invoice Amount': 'Total_Invoice_Amount',
                              'Invoice Date': 'Total_Invoice_Count', })
-
-    # Validate input
+        input_df['Client'] = clientname
+    # Null case
     else:
-        input_df = None
-    try:
-        input_df
-    except Exception:
-        logging.info('Something went wrong loading the new client data...')
+        logging.info('Sorry, something went wrong loading the new client data...')
         raise SystemExit()
 
-    ####################################
-    # Data Processing Pipeline
+    # Create average invoice column
     logging.info('\nPreparing data for analysis...')
-    total = input_df['Total_Invoice_Amount']
-    count = input_df['Total_Invoice_Count']
-    input_df['Avg_Invoice_Size'] = total / count
+    input_df['Avg_Invoice_Size'] = input_df['Total_Invoice_Amount'] / input_df['Total_Invoice_Count']
 
+    # Create unique list of suppliers
     logging.info('\nCreating unique list of suppliers...')
     suppliers = pd.DataFrame({'Supplier': input_df['Supplier'].unique()})
 
+    # Merge input data with crossref
     logging.info('\nMatching supplier names against cross-reference file...')
-    input_df_with_ref = pd.merge(suppliers, supplier_crossref_list, on='Supplier', how='left')
+    suppliers = pd.merge(suppliers, supplier_crossref_list, on='Supplier', how='left')
 
-    logging.info('\nIdentifying non-matched suppliers...')
-    unmatched = pd.DataFrame({
-        'Supplier': input_df_with_ref[input_df_with_ref['Supplier_ref'].isnull()]['Supplier'].unique()})
-    unmatched = unmatched.rename(columns={'Supplier': 'Unmatched_Supplier'}).reset_index()
-    unmatched = unmatched.groupby(['Unmatched_Supplier']).size().reset_index(name='Freq')
-
+    # Identify non-matched suppliers
+    unmatched = pd.DataFrame({'Unmatched': suppliers[suppliers['Supplier_ref'].isnull()]['Supplier'].unique()})
+    matched = pd.DataFrame({'Matched': suppliers[suppliers['Supplier_ref'].notnull()]['Supplier_ref'].unique()})
     count_total = len(suppliers)
-    count_matched = len(input_df_with_ref[input_df_with_ref['Supplier_ref'].notnull()]['Supplier_ref'].unique())
+    count_matched = len(matched)
     count_unmatched = len(unmatched)
 
-    logging.info(f'\nTotal suppliers: {count_total}')
-    logging.info(f'Matched suppliers: {count_matched}')
-    logging.info(f'Unmatched suppliers: {count_unmatched}')
+    # Print info about the matching
+    logging.info(f'\tTotal suppliers: {count_total}')
+    logging.info(f'\tMatched suppliers: {count_matched}')
+    logging.info(f'\tUnmatched suppliers: {count_unmatched}')
     logging.info(f'\nTrying to soft-match the unmatched suppliers...')
 
-    supplier_lookup = pd.DataFrame({'Supplier_ref': supplier_crossref_list['Supplier_ref'].unique()})
-    unmatched_cross_ref = pd.merge(unmatched, supplier_lookup, on='key').drop('key', axis=1)
+    # Clean up the supplier name string
+    unmatched['Cleaned'] = [helpers.clean_up_string(s) for s in unmatched.Unmatched]
+    unmatched_series = unmatched['Cleaned']
+    reference_series = commodity_df['Supplier_ref']
 
-    # Create a cleaned version of Unmatched_Supplier
-    unmatched_cross_ref['Unmatched_Supplier_Cleaned'] = [
-        clean_up_string(s) for s in tqdm(unmatched_cross_ref.Unmatched_Supplier)]
-
-    # Do the full softmatch, this will associate a MatchRatio to each possible match on the cleaned up version
+    # Find candidate matches with score above threshold
     logging.info('\nEvaluating soft-matching scores...')
-    name1 = 'Unmatched_Supplier_Cleaned'
-    name2 = 'Supplier_ref'
-    series1 = unmatched_cross_ref[name1]
-    series2 = unmatched_cross_ref[name2]
-    unmatched_cross_ref['MatchRatio'] = [fuzz_ratio(s1, s2) for s1, s2 in tqdm(zip(series1, series2))]
+    candidates = {}
+    for s in unmatched_series:
+        d = {r: fuzz.ratio(s, r) for r in reference_series}
+        if max(d.values()) > threshold:
+            k = helpers.keys_with_top_values(d)
+            # print(f'\n{s}... {k}')
+            candidates[s] = k
+    # print(candidates.items())
+
+    countsoftmatch = len(candidates)
+    logging.info(f'\nFound potential soft-matches for {countsoftmatch} suppliers')
+
+    #  TODO deal with cases where there is more than one softmatch--now just taking the first one scoring above 89
+    bestmatches = pd.DataFrame({item[0]: item[1][0] for item in candidates.items()}).T.reset_index()
+    bestmatches.columns = ['Supplier', 'Supplier_ref', 'Softmatch_Score']
+
+    # bring in the commodity
+    suppliers = suppliers.merge(bestmatches, on='Supplier')
+    raise SystemExit()
 
     ####################################
-    # STEP 5c: Find the closest softmatch
-    best_matches = sel_distinct(unmatched_cross_ref, ['Unmatched_Supplier'], ['MatchRatio'], 1)[
-        ['Unmatched_Supplier', 'Supplier_ref', 'MatchRatio']]
-
-    ####################################
-    # STEP 5d: If > 85 match, then called matched
-    soft_matches = best_matches.loc[best_matches['MatchRatio'] > threshold]
-    soft_matches = (
-        soft_matches[['Unmatched_Supplier', 'Supplier_ref', 'MatchRatio']].rename(
-            columns={'Unmatched_Supplier': 'Supplier'}))
-    # update the input_df_with_ref with these new softmatches
-    input_df_with_ref.update(soft_matches)
-
-    ####################################
-    # STEP 5e: If <= 85 match, then called no soft matched
-    no_soft_matches = best_matches.loc[best_matches['MatchRatio'] <= threshold][['Unmatched_Supplier']]
-
-    ####################################
-    # STEP 5f: consolidate the no_soft_matches (as they might have duplicates)
-    no_soft_matches_1 = no_soft_matches.copy()
-    no_soft_matches_2 = no_soft_matches.copy()
-
-    no_soft_matches_2['key'] = 1
-    no_soft_matches_1['key'] = 1
-    no_soft_matches_2 = no_soft_matches_2.rename(columns={'Unmatched_Supplier': 'Unmatched_Supplier' + "_2"})
-
-    no_soft_matches_full_join = pd.merge(no_soft_matches_1, no_soft_matches_2, on='key').drop('key', axis=1)
-    no_soft_matches_full_join['MatchRatio'] = (
-        np.vectorize(fuzz_ratio, otypes=[int])(no_soft_matches_full_join['Unmatched_Supplier'],
-                                               no_soft_matches_full_join['Unmatched_Supplier' + "_2"]))  # fixme
-
-    # pick close matches
-    no_soft_matches_closematches = no_soft_matches_full_join.loc[(no_soft_matches_full_join['MatchRatio'] > 85)].copy()
-    no_soft_matches_closematches = no_soft_matches_closematches.reset_index()
-    no_soft_matches_closematches = no_soft_matches_closematches.sort_values(
-        by=['Unmatched_Supplier', 'Unmatched_Supplier_2'])
-
-    # for all the variants, pick the match with the longest (changed to shortest) variant
-    no_soft_matches_cross_ref = no_soft_matches_closematches[
-        ['Unmatched_Supplier', 'Unmatched_Supplier_2']].copy().reset_index()
-    no_soft_matchesd_cross_ref = no_soft_matches_cross_ref.sort_values(
-        by=['Unmatched_Supplier', 'Unmatched_Supplier_2'])
-    no_soft_matches_cross_ref = group_by_stats_list_min(no_soft_matches_cross_ref, ['Unmatched_Supplier'],
-                                                        ['Unmatched_Supplier_2'])
-    no_soft_matches_cross_ref = no_soft_matches_cross_ref.rename(
-        columns={'Unmatched_Supplier_2': 'Unmatched_Supplier_croosref'})
-
-    no_soft_matches_cross_ref = no_soft_matches_cross_ref.reset_index()
-
-    ####################################
-    # STEP 8: bring in the commodity
-
-    logging.info('\nAdding commodity type to supplier invoice data...')
-    input_df_with_ref = (pd.merge(input_df_with_ref,
-                                  commodity_df, on=['Supplier_ref'], how='left'))  # TODO investigate this join
-    # fill_in when not available
-    input_df_with_ref["Commodity"].fillna("NOT_AVAILABLE", inplace=True)
-
-    # keep record of the original commodity before consolidating low count commodities for scoring
-    input_df_with_ref["Original_Commodity"] = input_df_with_ref["Commodity"].copy()
-
-    # fill_in small value commodities with SMALL_COUNT_COMM_GROUPS
-    input_df_with_ref["Commodity"] = input_df_with_ref["Commodity"].replace("FACILITIES MAINTENANCE/SECURITY",
-                                                                            "SMALL_COUNT_COMM_GROUPS")
-    input_df_with_ref["Commodity"] = input_df_with_ref["Commodity"].replace("FACILITIES MAINTENANCE/SECURITY",
-                                                                            "SMALL_COUNT_COMM_GROUPS")
-    input_df_with_ref["Commodity"] = input_df_with_ref["Commodity"].replace("REMOVE", "SMALL_COUNT_COMM_GROUPS")
-    input_df_with_ref["Commodity"] = input_df_with_ref["Commodity"].replace("STAFF AUGMENTATION",
-                                                                            "SMALL_COUNT_COMM_GROUPS")
-    input_df_with_ref["Commodity"] = input_df_with_ref["Commodity"].replace("INSPECTION/MONITORING/LAB SERVICES",
-                                                                            "SMALL_COUNT_COMM_GROUPS")
-    input_df_with_ref["Commodity"] = input_df_with_ref["Commodity"].replace("TELECOMMUNICATIONS",
-                                                                            "SMALL_COUNT_COMM_GROUPS")
-    input_df_with_ref["Commodity"] = input_df_with_ref["Commodity"].replace("METER READING SERVICES",
-                                                                            "SMALL_COUNT_COMM_GROUPS")
-    input_df_with_ref["Commodity"] = input_df_with_ref["Commodity"].replace("CHEMICALS/ADDITIVES/INDUSTRIAL GAS",
-                                                                            "SMALL_COUNT_COMM_GROUPS")
-    # input_df_with_ref.head(5)
-
-    ###################################
     # Scorecard computations
-
-    # STEP 8a: read in the scorecard
     logging.info('\nCalculating supplier scores based on scorecard...')
-    supplier_scorecard = pd.read_sql('SELECT * FROM Revenew.dbo.scorecard', engine)
-    # supplier_scorecard.to_sql('scorecard', con=engine, index=False, if_exists='replace', schema='Revenew.dbo')
-    # supplier_scorecard.head(5)
 
     # STEP 8b: do a full outer join with the scorecard
-    input_df_with_ref['key'] = 1
+    suppliers['key'] = 1
     supplier_scorecard['key'] = 1
-    input_df_with_ref_with_scorecard = pd.merge(input_df_with_ref, supplier_scorecard, on='key').drop('key', axis=1)
+    input_df_with_ref_with_scorecard = pd.merge(suppliers, supplier_scorecard, on='key').drop('key', axis=1)
 
     # STEP 8c-1: get the Spend sub-dataframe
     input_df_with_ref_with_scorecard_spend = (

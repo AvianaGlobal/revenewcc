@@ -1,20 +1,6 @@
+import re
 import pandas as pd
 from sqlalchemy import create_engine
-
-
-class Defaults:
-    dsn = "cc"
-    database = "RevenewTest"
-    driver = "/usr/local/lib/libmsodbcsql.13.dylib"
-    filename = "revenewCC/tests/MissingColumns.csv"
-    filename2 = "revenewCC/tests/QEP2019_invoice.csv"
-    outputdir = "/Users/mj/Desktop/"
-    clientname = 'equinor'
-    host = '208.43.250.18'
-    port = '51949'
-    user = 'sa'
-    password = 'Aviana$92821'
-    cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
 
 
 def connectdb(cnxn_str):
@@ -124,14 +110,14 @@ def group_by_stats_list_min(df, group_by_cols, val_cols):
 def clean_up_string(inp_string):
     cleaned = lower_case(inp_string)
     cleaned = remove_substring_after_separator(cleaned, "dba")
-    cleaned = remove_substring_after_separator(cleaned, "-")
+    # cleaned = remove_substring_after_separator(cleaned, "-")
     cleaned = remove_stuff_within_paranthesis(cleaned)
     cleaned = strip(cleaned)
     cleaned = cleaned.replace('.', '')
     cleaned = cleaned.replace(',', '')
     cleaned = cleaned.replace('  ', ' ')
     cleaned = cleaned.replace('&', 'and')
-    cleaned = cleaned.replace('-', '')
+    cleaned = cleaned.replace('-', ' ')
     cleaned = cleaned.replace(')', '')
     cleaned = cleaned.replace('*', '')
     cleaned = cleaned.replace('@', '')
@@ -142,6 +128,10 @@ def clean_up_string(inp_string):
     cleaned = cleaned.replace('limited', 'ltd')
     cleaned = cleaned.replace('"', '')
     return cleaned
+
+
+def keys_with_top_values(my_dict):
+    return [(key, value) for (key, value) in my_dict.items() if value == max(my_dict.values())]
 
 
 if __name__ == '__main__':

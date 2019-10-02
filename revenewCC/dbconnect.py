@@ -9,6 +9,8 @@ if sys.platform == 'darwin':
     database = 'AvianaML'
     driver = '/usr/local/lib/libmsodbcsql.13.dylib'
     runtype = 'Mac'
+    dsn = 'cc'
+
 else:
     runtype = 'Windows'
     dsn = 'cc'
