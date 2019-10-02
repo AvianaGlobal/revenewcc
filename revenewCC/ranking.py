@@ -149,7 +149,7 @@ def main():
         # f = io.StringIO()
         # with redirect_stderr(f):
         for chunk in tqdm(chunks):
-            input_df = pd.concat([input_df, chunk])
+            temp_df = pd.concat([temp_df, chunk])
             # prog = f.getvalue().split('\r ')[-1].strip()
             # print(prog)
             # time.sleep(0.2)
@@ -186,8 +186,8 @@ def main():
     suppliers = pd.merge(suppliers, supplier_crossref_list, on='Supplier', how='left')
 
     # Identify non-matched suppliers
-    unmatched = pd.DataFrame({'Unmatched': suppliers[suppliers['Supplier_ref'].isnull()]['Supplier'].unique()})
-    matched = pd.DataFrame({'Matched': suppliers[suppliers['Supplier_ref'].notnull()]['Supplier_ref'].unique()})
+    unmatched = pd.DataFrame({'Supplier': suppliers[suppliers['Supplier_ref'].isnull()]['Supplier'].unique()})
+    matched = pd.DataFrame({'Supplier': suppliers[suppliers['Supplier_ref'].notnull()]['Supplier'].unique()})
     count_total = len(suppliers)
     count_matched = len(matched)
     count_unmatched = len(unmatched)
@@ -199,32 +199,30 @@ def main():
     logging.info(f'\nTrying to soft-match the unmatched suppliers...')
 
     # Clean up the supplier name string
-    unmatched['Cleaned'] = [helpers.clean_up_string(s) for s in unmatched.Unmatched]
+    unmatched['Cleaned'] = [helpers.clean_up_string(s) for s in unmatched.Supplier]
+    matched['Cleaned'] = [helpers.clean_up_string(s) for s in matched.Supplier]
     unmatched_series = unmatched['Cleaned']
     reference_series = commodity_df['Supplier_ref']
 
     # Find candidate matches with score above threshold
-    logging.info('\nEvaluating soft-matching scores...')
     candidates = {}
-    for s in unmatched_series:
+    for i, s in enumerate(unmatched_series):
+        prog = round(100 * ((i + 1) / count_unmatched), 2)
         d = {r: fuzz.ratio(s, r) for r in reference_series}
         if max(d.values()) > threshold:
             k = helpers.keys_with_top_values(d)
-            # print(f'\n{s}... {k}')
+            # print(f'{s} = {k[0][0]}...?')
             candidates[s] = k
-    # print(candidates.items())
+        print(f'{i + 1}/{count_unmatched} ({prog}%)', end='\r', flush=True)
 
     countsoftmatch = len(candidates)
-    logging.info(f'\nFound potential soft-matches for {countsoftmatch} suppliers')
+    logging.info(f'\tFound potential soft-matches for {countsoftmatch} suppliers')
 
     #  TODO deal with cases where there is more than one softmatch--now just taking the first one scoring above 89
     bestmatches = pd.DataFrame({item[0]: item[1][0] for item in candidates.items()}).T.reset_index()
-    bestmatches.columns = ['Supplier', 'Supplier_ref', 'Softmatch_Score']
+    bestmatches.columns = ['Cleaned', 'Supplier_ref', 'Softmatch_Score']
 
-    # bring in the commodity
-    suppliers = suppliers.merge(bestmatches, on='Supplier')
-    raise SystemExit()
-
+    # TODO add best matches back to supplier list
     ####################################
     # Scorecard computations
     logging.info('\nCalculating supplier scores based on scorecard...')
