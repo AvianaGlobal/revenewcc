@@ -33,10 +33,10 @@ def main():
 
     from revenewCC import helpers
     from revenewCC.dbconnect import dbconnect
-    from revenewCC.defaults import database, clientname, filename, filename2, outputdir
+    # from revenewCC.defaults import database, clientname, filename, filename2, outputdir
 
     # Set up data connection
-    # engine = dbconnect()
+    engine = dbconnect()
 
     # Set up logging
     start = timer()
