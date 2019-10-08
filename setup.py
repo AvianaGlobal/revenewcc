@@ -3,10 +3,9 @@ import os
 
 setup(
     name='revenewCC',
-    version='0.2',
+    version='0.3',
     packages=find_packages(),
     include_package_data=True,
-    install_dir=os.getcwd(),
     install_requires=[
         'pandas',
         'sqlalchemy',
@@ -17,7 +16,7 @@ setup(
         'python-Levenshtein',
     ],
     entry_points={
-        'console_scripts': [
+        'gui_scripts': [
             'ranking=revenewCC.ranking:main'
         ]
     }
