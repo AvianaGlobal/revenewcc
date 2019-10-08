@@ -3,7 +3,7 @@ from gooey import Gooey
 
 
 @Gooey(program_name='\nRevenewML\nCC Supplier Ranking\n', default_size=(700, 700), image_dir='::gooey/default',
-    language_dir='gooey/languages', )
+       language_dir='gooey/languages', )
 def main():
     from revenewCC.argparser import parser
     args = parser.parse_args()
@@ -65,8 +65,9 @@ def main():
 
     # fill_in small value commodities with SMALL_COUNT_COMM_GROUPS
     commodity_df["Commodity"].replace(to_replace=["FACILITIES MAINTENANCE/SECURITY", "REMOVE", "STAFF AUGMENTATION",
-        "INSPECTION/MONITORING/LAB SERVICES", "TELECOMMUNICATIONS", "METER READING SERVICES",
-        "CHEMICALS/ADDITIVES/INDUSTRIAL GAS", ], value="SMALL_COUNT_COMM_GROUPS", inplace=True)
+                                                  "INSPECTION/MONITORING/LAB SERVICES", "TELECOMMUNICATIONS",
+                                                  "METER READING SERVICES", "CHEMICALS/ADDITIVES/INDUSTRIAL GAS", ],
+                                      value="SMALL_COUNT_COMM_GROUPS", inplace=True)
 
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
@@ -222,7 +223,7 @@ def main():
 
     final_df = input_df.merge(xref, on='Supplier').drop(columns='Cleaned')[
         ['Client', 'Supplier', 'Supplier_ref', 'Commodity', 'Year', 'Total_Invoice_Amount', 'Total_Invoice_Count',
-            'Avg_Invoice_Size', ]]
+         'Avg_Invoice_Size', ]]
 
     # Scorecard computations
     logging.info('\nCalculating supplier scores based on scorecard...')
@@ -312,8 +313,8 @@ def main():
                                            'Avg_Invoice_Size_Max': 'Avg_Invoice_Size'}))
 
         Yr_data_comm = (
-        component_scores.loc[(component_scores['Year'] == Yr) & (component_scores['Factor'] == "Commodity")][
-            ['Client', 'Supplier_ref', 'Year', 'Original_Commodity']])
+            component_scores.loc[(component_scores['Year'] == Yr) & (component_scores['Factor'] == "Commodity")][
+                ['Client', 'Supplier_ref', 'Year', 'Original_Commodity']])
 
         Yr_data = pd.merge(Yr_data, Yr_data_comm, on=['Client', 'Supplier_ref', 'Year'])
 
