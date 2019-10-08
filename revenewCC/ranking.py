@@ -20,16 +20,20 @@ def main():
     outputdir = args.outputdir
     threshold = 89
 
-    import io
     import os
     import time
     import logging
     import numpy as np
     import pandas as pd
-    from contextlib import redirect_stderr
-    from tqdm.auto import tqdm
     from fuzzywuzzy import fuzz
     from timeit import default_timer as timer
+
+    # ### For progress bar ###
+    #
+    # import io
+    # from contextlib import redirect_stderr
+    # from tqdm.auto import tqdm
+    #
 
     from revenewCC import helpers
     from revenewCC.dbconnect import dbconnect
@@ -113,12 +117,13 @@ def main():
             GROUP BY Supplier, datename(YEAR, Invoice_Date)) 
             SELECT COUNT(*) as Count FROM df             
 """
-        count = pd.read_sql(countquery, engine).values[0][0]
         input_df = pd.DataFrame()
         chunks = pd.read_sql(dataquery, engine, chunksize=1)
+        # count = pd.read_sql(countquery, engine).values[0][0]
         # f = io.StringIO()
         # with redirect_stderr(f):
-        for chunk in tqdm(chunks, total=count):
+        # for chunk in tqdm(chunks, total=count):
+        for chunk in chunks:
             input_df = pd.concat([input_df, chunk])
             # prog = f.getvalue().split('\r ')[-1].strip()
             # print(prog)
@@ -130,7 +135,7 @@ def main():
         chunks = pd.read_csv(filename, encoding='ISO-8859-1', low_memory=False, chunksize=1)
         # f = io.StringIO()
         # with redirect_stderr(f):
-        for chunk in tqdm(chunks):
+        for chunk in chunks:
             input_df = pd.concat([input_df, chunk])
             # prog = f.getvalue().split('\r ')[-1].strip()
             # print(prog)
@@ -148,7 +153,7 @@ def main():
         chunks = pd.read_csv(filename2, encoding='ISO-8859-1', low_memory=False, chunksize=1)
         # f = io.StringIO()
         # with redirect_stderr(f):
-        for chunk in tqdm(chunks):
+        for chunk in chunks:
             temp_df = pd.concat([temp_df, chunk])
             # prog = f.getvalue().split('\r ')[-1].strip()
             # print(prog)
@@ -199,6 +204,7 @@ def main():
     logging.info(f'\nTrying to soft-match the unmatched suppliers...')
 
     # Clean up the supplier name string
+    input_df['Cleaned'] = [helpers.clean_up_string(s) for s in input_df.Supplier]
     unmatched['Cleaned'] = [helpers.clean_up_string(s) for s in unmatched.Supplier]
     matched['Cleaned'] = [helpers.clean_up_string(s) for s in matched.Supplier]
     unmatched_series = unmatched['Cleaned']
@@ -213,7 +219,7 @@ def main():
             k = helpers.keys_with_top_values(d)
             # print(f'{s} = {k[0][0]}...?')
             candidates[s] = k
-        print(f'{i + 1}/{count_unmatched} ({prog}%)', end='\r', flush=True)
+        # print(f'{i + 1}/{count_unmatched} ({prog}%)', end='\r', flush=True)
 
     countsoftmatch = len(candidates)
     logging.info(f'\tFound potential soft-matches for {countsoftmatch} suppliers')
@@ -300,14 +306,10 @@ def main():
     scores = scores.append(input_df_with_ref_with_scorecard_commodity, ignore_index=True)
 
     # score at supplier-year-factor-tier level
-    component_scores = scores.copy()
-    # component_scores = scores[['Client', 'Supplier_ref', 'Year', 'Factor', 'Tier', 'Points']].copy()
+    component_scores = ...
 
     # score at supplier-year level
-    scores = (group_by_stats_list_sum(scores, ['Client', 'Supplier_ref', 'Year'],
-                                      ['Points'])
-    [['Client', 'Supplier_ref', 'Year', 'Points_Sum']])
-
+    scores = ...
     logging.info(f'\nWriting output file to {outputdir}...')
 
     ####################################
@@ -384,7 +386,6 @@ def main():
     unmatched.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
     bestmatches.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
     unmatched.to_excel(writer, sheet_name='NoSoft_Matched_Supp', index=False)
-    # unmatched.to_excel(writer, sheet_name='NoSoft_Matched_Supp_Consol', index=False)  # Fixme
     component_scores.to_excel(writer, sheet_name='Component_Scores', index=False)
     scores.to_excel(writer, sheet_name='SupplierScoreCard', index=False)
     final_data.to_excel(writer, sheet_name='FinalScorecard', index=False)
