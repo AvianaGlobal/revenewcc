@@ -7,17 +7,20 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
+        'fuzzywuzzy',
         'pandas',
         'sqlalchemy',
-        'fuzzywuzzy',
-        'xlsxwriter',
+        'pillow',
         'pyodbc',
-        'wxpython',
         'python-Levenshtein',
+        'tqdm',
+        'wxpython',
+        'xlsxwriter',
     ],
     entry_points={
-        'gui_scripts': [
+        'console_scripts': [
             'ranking=revenewCC.ranking:main'
         ]
     }
 )
+
