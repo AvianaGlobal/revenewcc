@@ -115,7 +115,6 @@ def clean_up_string(inp_string):
     cleaned = strip(cleaned)
     cleaned = cleaned.replace('.', '')
     cleaned = cleaned.replace(',', '')
-    cleaned = cleaned.replace('  ', ' ')
     cleaned = cleaned.replace('&', 'and')
     cleaned = cleaned.replace('-', ' ')
     cleaned = cleaned.replace(')', '')
@@ -126,7 +125,9 @@ def clean_up_string(inp_string):
     cleaned = cleaned.replace('corporation', 'corp')
     cleaned = cleaned.replace('incorporated', 'inc')
     cleaned = cleaned.replace('limited', 'ltd')
+    cleaned = cleaned.replace('  ', ' ')
     cleaned = cleaned.replace('"', '')
+    cleaned = cleaned.replace("'", '')
     return cleaned
 
 

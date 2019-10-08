@@ -1,5 +1,5 @@
 dsn = "cc"
-database = "QEP_2019"
+database = None
 clientname = 'QEP'
 driver = "/usr/local/lib/libmsodbcsql.13.dylib"
 filename = "revenewCC/inputdata/TestNonSPR_Rolledup.csv"

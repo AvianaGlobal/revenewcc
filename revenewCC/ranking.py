@@ -9,7 +9,6 @@ from gooey import Gooey
     language_dir='gooey/languages',
 )
 def main():
-    # Top level imports
     from revenewCC.argparser import parser
     args = parser.parse_args()
     dsn = args.dsn
@@ -18,6 +17,7 @@ def main():
     filename = args.filename
     filename2 = args.filename2
     outputdir = args.outputdir
+
     threshold = 89
 
     import os
@@ -40,7 +40,7 @@ def main():
     from revenewCC.defaults import database, clientname, filename, filename2
 
     # Set up data connection
-    engine = dbconnect()
+    # engine = dbconnect()
 
     # Set up logging
     start = timer()
@@ -132,7 +132,7 @@ def main():
     # Case 2: Non-SPR Client, Rolled Up
     elif filename is not None:
         input_df = pd.DataFrame()
-        chunks = pd.read_csv(filename, encoding='ISO-8859-1', low_memory=False, chunksize=1)
+        chunks = pd.read_csv(filename, encoding='ISO-8859-1', low_memory=False, chunksize=1, na_values='')
         # f = io.StringIO()
         # with redirect_stderr(f):
         for chunk in chunks:
@@ -178,24 +178,27 @@ def main():
         logging.info('Sorry, something went wrong loading the new client data...')
         raise SystemExit()
 
-    # Create average invoice column
+    # Data processing
     logging.info('\nPreparing data for analysis...')
+    input_df = input_df.dropna().reset_index(drop=True)
+    input_df['Total_Invoice_Count'] = input_df.Total_Invoice_Count.fillna(0).astype(int)
+    input_df['Year'] = input_df.Year.fillna(0).astype(int).astype(str)
     input_df['Avg_Invoice_Size'] = input_df['Total_Invoice_Amount'] / input_df['Total_Invoice_Count']
+
+    # Clean up the supplier name string
+    input_df['Cleaned'] = [helpers.clean_up_string(s) for s in input_df.Supplier.fillna('')]
 
     # Create unique list of suppliers
     logging.info('\nCreating unique list of suppliers...')
-    suppliers = pd.DataFrame({'Supplier': input_df['Supplier'].unique()})
+    suppliers = input_df[['Supplier', 'Cleaned']].dropna().drop_duplicates()
 
     # Merge input data with crossref
     logging.info('\nMatching supplier names against cross-reference file...')
-    suppliers = pd.merge(suppliers, supplier_crossref_list, on='Supplier', how='left')
 
-    # Identify non-matched suppliers
-    unmatched = pd.DataFrame({'Supplier': suppliers[suppliers['Supplier_ref'].isnull()]['Supplier'].unique()})
-    matched = pd.DataFrame({'Supplier': suppliers[suppliers['Supplier_ref'].notnull()]['Supplier'].unique()})
-    count_total = len(suppliers)
-    count_matched = len(matched)
-    count_unmatched = len(unmatched)
+    combined = pd.merge(suppliers, supplier_crossref_list, on='Supplier', how='outer', indicator=True)
+    unmatched = combined[combined['_merge'] == 'left_only'].drop(columns=['_merge', 'Supplier_ref'])
+    matched = combined[combined['_merge'] == 'both'].drop(columns=['_merge', 'Cleaned'])
+    count_total, count_matched, count_unmatched = len(suppliers), len(matched), len(unmatched)
 
     # Print info about the matching
     logging.info(f'\tTotal suppliers: {count_total}')
@@ -203,10 +206,6 @@ def main():
     logging.info(f'\tUnmatched suppliers: {count_unmatched}')
     logging.info(f'\nTrying to soft-match the unmatched suppliers...')
 
-    # Clean up the supplier name string
-    input_df['Cleaned'] = [helpers.clean_up_string(s) for s in input_df.Supplier]
-    unmatched['Cleaned'] = [helpers.clean_up_string(s) for s in unmatched.Supplier]
-    matched['Cleaned'] = [helpers.clean_up_string(s) for s in matched.Supplier]
     unmatched_series = unmatched['Cleaned']
     reference_series = commodity_df['Supplier_ref']
 
@@ -217,26 +216,48 @@ def main():
         d = {r: fuzz.ratio(s, r) for r in reference_series}
         if max(d.values()) > threshold:
             k = helpers.keys_with_top_values(d)
-            # print(f'{s} = {k[0][0]}...?')
+            print(f'{s} = {k[0][0]}...?')
             candidates[s] = k
-        # print(f'{i + 1}/{count_unmatched} ({prog}%)', end='\r', flush=True)
+        print(f'{i + 1}/{count_unmatched} ({prog}%)', end='\r', flush=True)
 
-    countsoftmatch = len(candidates)
-    logging.info(f'\tFound potential soft-matches for {countsoftmatch} suppliers')
+    count_softmatch = len(candidates)
+    logging.info(f'\tFound potential soft-matches for {count_softmatch} supplier(s)')
 
-    #  TODO deal with cases where there is more than one softmatch--now just taking the first one scoring above 89
-    bestmatches = pd.DataFrame({item[0]: item[1][0] for item in candidates.items()}).T.reset_index()
-    bestmatches.columns = ['Cleaned', 'Supplier_ref', 'Softmatch_Score']
+    #  TODO deal with cases where there is more than one softmatch--just taking the first one for now
+    best_matches = pd.DataFrame({item[0]: item[1][0] for item in candidates.items()}).T \
+        .merge(suppliers, left_index=True, right_on='Cleaned')\
+        .rename(columns={0: 'Supplier_ref', 1: 'Softmatch_Score'})
 
-    # TODO add best matches back to supplier list
+    # Combine softmatches with unmatched suppliers
+    soft_matched = unmatched.merge(best_matches[['Supplier', 'Supplier_ref']], on='Supplier', how='left')
+    # soft_matched['Supplier_ref'].fillna(value=soft_matched['Cleaned'], inplace=True)
+    soft_matched.drop(columns='Cleaned', inplace=True)
+
+    # Add best matches back to supplier list
+    xref = pd.concat([matched, soft_matched], axis=0, sort=True, ignore_index=True).merge(commodity_df, on='Supplier_ref')
+
+    len(xref.Supplier.unique())
+    len(xref.Supplier_ref.unique())
+
+    final_df = input_df.merge(xref, on='Supplier').drop(columns='Cleaned')[[
+        'Client',
+        'Supplier',
+        'Supplier_ref',
+        'Commodity',
+        'Year',
+        'Total_Invoice_Amount',
+        'Total_Invoice_Count',
+        'Avg_Invoice_Size',
+    ]]
+
     ####################################
     # Scorecard computations
     logging.info('\nCalculating supplier scores based on scorecard...')
 
     # STEP 8b: do a full outer join with the scorecard
-    suppliers['key'] = 1
+    final_df['key'] = 1
     supplier_scorecard['key'] = 1
-    input_df_with_ref_with_scorecard = pd.merge(suppliers, supplier_scorecard, on='key').drop('key', axis=1)
+    input_df_with_ref_with_scorecard = pd.merge(final_df, supplier_scorecard, on='key').drop('key', axis=1)
 
     # STEP 8c-1: get the Spend sub-dataframe
     input_df_with_ref_with_scorecard_spend = (
@@ -326,7 +347,7 @@ def main():
         Yr_data = component_scores.loc[component_scores['Year'] == Yr]
 
         Yr_data = (helpers.group_by_stats_list_max(Yr_data, ['Client', 'Supplier_ref', 'Year'],
-                                           ['Total_Invoice_Amount', 'Total_Invoice_Count', 'Avg_Invoice_Size'])
+                                                   ['Total_Invoice_Amount', 'Total_Invoice_Count', 'Avg_Invoice_Size'])
         [['Client', 'Supplier_ref', 'Year', 'Total_Invoice_Amount_Max',
           'Total_Invoice_Count_Max', 'Avg_Invoice_Size_Max']])
 
@@ -384,7 +405,7 @@ def main():
     input_df.to_excel(writer, sheet_name='Raw_Data', index=False)
     matched.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
     unmatched.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
-    bestmatches.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
+    best_matches.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
     unmatched.to_excel(writer, sheet_name='NoSoft_Matched_Supp', index=False)
     component_scores.to_excel(writer, sheet_name='Component_Scores', index=False)
     scores.to_excel(writer, sheet_name='SupplierScoreCard', index=False)
