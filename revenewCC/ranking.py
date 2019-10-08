@@ -323,7 +323,7 @@ def main():
         Yr = years[i]
         Yr_data = component_scores.loc[component_scores['Year'] == Yr]
 
-        Yr_data = (group_by_stats_list_max(Yr_data, ['Client', 'Supplier_ref', 'Year'],
+        Yr_data = (helpers.group_by_stats_list_max(Yr_data, ['Client', 'Supplier_ref', 'Year'],
                                            ['Total_Invoice_Amount', 'Total_Invoice_Count', 'Avg_Invoice_Size'])
         [['Client', 'Supplier_ref', 'Year', 'Total_Invoice_Amount_Max',
           'Total_Invoice_Count_Max', 'Avg_Invoice_Size_Max']])
@@ -365,13 +365,12 @@ def main():
                                final_data, on=['Client', 'Supplier_ref']))
         i = i + 1
 
-    # rearrange
+    # Create new dataframe with columns in the order you want
     cols = list(final_data.columns.values)  # Make a list of all of the columns in the df
     cols.pop(cols.index('Client'))
     cols.pop(cols.index('Supplier_ref'))
     cols.pop(cols.index('Original_Commodity'))
-    final_data = final_data[['Client', 'Supplier_ref',
-                             'Original_Commodity'] + cols]  # Create new dataframe with columns in the order you want
+    final_data = final_data[['Client', 'Supplier_ref', 'Original_Commodity'] + cols]
 
     ####################################
     # STEP 10:  Write out all results into a spreadsheet
@@ -383,9 +382,9 @@ def main():
     input_df.to_excel(writer, sheet_name='Raw_Data', index=False)
     matched.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
     unmatched.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
-    soft_matches.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
-    no_soft_matches.to_excel(writer, sheet_name='NoSoft_Matched_Supp', index=False)
-    no_soft_matches_cross_ref.to_excel(writer, sheet_name='NoSoft_Matched_Supp_Consol', index=False)
+    bestmatches.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
+    unmatched.to_excel(writer, sheet_name='NoSoft_Matched_Supp', index=False)
+    # unmatched.to_excel(writer, sheet_name='NoSoft_Matched_Supp_Consol', index=False)  # Fixme
     component_scores.to_excel(writer, sheet_name='Component_Scores', index=False)
     scores.to_excel(writer, sheet_name='SupplierScoreCard', index=False)
     final_data.to_excel(writer, sheet_name='FinalScorecard', index=False)
