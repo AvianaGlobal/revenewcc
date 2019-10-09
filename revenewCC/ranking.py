@@ -33,7 +33,11 @@ def main():
 
     from revenewCC import helpers
     from revenewCC.dbconnect import dbconnect
+
+    # ### Use these default settigns for debugging
+    #
     # from revenewCC.defaults import database, clientname, filename, filename2, outputdir
+    #
 
     # Set up data connection
     engine = dbconnect()
