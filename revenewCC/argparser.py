@@ -24,11 +24,11 @@ grp.add_argument('--filename',
                  metavar='NonSPR Client - Rolled Up',
                  widget='FileChooser',
                  help='CSV file '
-                      'Columns = Client, Supplier, Year, Total_Invoice_Amount, Total_Invoice_Count',
+                      'Columns = Supplier, Year, Total_Invoice_Amount, Total_Invoice_Count',
                  action='store', )
 grp.add_argument('--filename2',
                  metavar='NonSPR Client - Raw',
                  widget='FileChooser',
                  help='CSV file '
-                      'Columns: Vendor Name, Invoice Date, Gross Invoice Amount',
+                      'Columns = Vendor Name, Invoice Date, Gross Invoice Amount',
                  action='store', )

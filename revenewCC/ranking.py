@@ -31,15 +31,32 @@ def main():
     #
 
     from revenewCC import helpers
-    from revenewCC.dbconnect import dbconnect
+    # from revenewCC.dbconnect import dbconnect
 
     # ### Use these default settigns for debugging
     #
     # from revenewCC.defaults import database, clientname, filename, filename2, outputdir
     #
 
+    import sys
     # Set up data connection
-    engine = dbconnect()
+    if sys.platform == 'darwin':
+        host = '208.43.250.18'
+        port = '51949'
+        user = 'sa'
+        password = 'Aviana$92821'
+        database = 'AvianaML'
+        driver = '/usr/local/lib/libmsodbcsql.13.dylib'
+        cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+    else:
+        cnxn_str = f'mssql+pyodbc://@{dsn}'
+
+    # Make database connection engine
+    from sqlalchemy import create_engine
+
+    # Options below are useful for debugging
+    engine = create_engine(cnxn_str)
+    engine.connect()
 
     # Set up logging
     start = timer()
