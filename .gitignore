@@ -4,10 +4,12 @@ __pycache__/
 \.ipynb_checkpoints/
 build/
 dist/
-revenewCC/inputdata/
 venv/
 docs/
+tests/
 \.DS_Store
 /**/*.pyc
 /**/*.parquet
 /**/*.txt
+/**/*.csv
+/**/*.xlsx

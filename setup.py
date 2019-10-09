@@ -3,23 +3,24 @@ import os
 
 setup(
     name='revenewCC',
-    version='0.1',
+    version='0.3',
     packages=find_packages(),
     include_package_data=True,
-    install_dir=os.getcwd(),
     install_requires=[
-        'Click',
+        'fuzzywuzzy',
         'pandas',
         'sqlalchemy',
-        'tqdm',
-        'fuzzywuzzy',
-        'python-Levenshtein',
-        'gooey',
-        'xlsxwriter',
+        'pillow',
         'pyodbc',
+        'python-Levenshtein',
+        'tqdm',
+        'wxpython',
+        'xlsxwriter',
     ],
-    entry_points='''
-        [console_scripts]
-        ranking=revenewCC.ranking:main
-    ''',
+    entry_points={
+        'console_scripts': [
+            'ranking=revenewCC.ranking:main'
+        ]
+    }
 )
+
