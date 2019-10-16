@@ -46,13 +46,13 @@ def main():
         port = '51949'
         user = 'sa'
         password = 'Aviana$92821'
-        database = 'AvianaML'
+        # database = 'AvianaML'
         if sys.platform == 'darwin':
             driver = '/usr/local/lib/libmsodbcsql.13.dylib'
-            cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+            cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}?driver={driver}'
         else:
             driver = '{SQL Server}'
-            cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+            cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}?driver={driver}'
             # cnxn_str = f'mssql+pyodbc://@{dsn}'
 
     # Make database connection engine
@@ -85,7 +85,8 @@ def main():
         ['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')[['Supplier_ref', 'Commodity']]
 
     # clean up
-    comm_df["Commodity"].fillna("NOT_AVAILABLE", inplace=True).replace(
+    comm_df["Commodity"] = comm_df["Commodity"].fillna("NOT_AVAILABLE")
+    comm_df["Commodity"].replace(
         to_replace=["FACILITIES MAINTENANCE/SECURITY", "REMOVE", "STAFF AUGMENTATION",
                     "INSPECTION/MONITORING/LAB SERVICES", "TELECOMMUNICATIONS", "METER READING SERVICES",
                     "CHEMICALS/ADDITIVES/INDUSTRIAL GAS", ], value="SMALL_COUNT_COMM_GROUPS", inplace=True)
