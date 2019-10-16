@@ -33,11 +33,12 @@ def main():
 
     # TODO: delete me!
     # Default database connection via ODBC
+    host = '208.43.250.18'
+    port = '51949'
+    user = 'sa'
+    password = 'Aviana$92821'
+    
     # dsn = 'cc'
-    # host = '208.43.250.18'
-    # port = '51949'
-    # user = 'sa'
-    # password = 'Aviana$92821'
     # database = 'RevenewTest'
 
     # Backdoor connection for developer
