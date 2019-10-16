@@ -242,7 +242,8 @@ def main():
         xref = xref.merge(comm_df, on='Supplier_ref', )
         final_df = input_df.merge(xref, on='Supplier').drop(columns='Cleaned')[keep_cols]
     else:
-        final_df = input_df.merge(matched, on='Supplier').drop(columns='Cleaned')[keep_cols]
+        xref = matched.merge(comm_df, on='Supplier_ref',)
+        final_df = input_df.merge(xref, on='Supplier').drop(columns='Cleaned')[keep_cols]
 
     # Scorecard computations
     logging.info('\nCalculating supplier scores based on scorecard...')
