@@ -55,8 +55,9 @@ def main():
             password = 'Aviana$92821'
             database = 'AvianaML'
             driver = "C:/Windows/System32/sqlsrv32.dll"
+            # cnxn_str = f'mssql+pyodbc://@{dsn}'
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    database = args.database  # cnxn_str = f'mssql+pyodbc://@{dsn}' == == == = else:
+    database = args.database
 
     # Make database connection engine
     from sqlalchemy import create_engine
