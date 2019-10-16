@@ -5,7 +5,6 @@ from gooey import Gooey
 @Gooey(program_name='\nRevenewML\nCC Supplier Ranking\n', default_size=(700, 700), image_dir='::gooey/default',
        language_dir='gooey/languages', )
 def main():
-
     # Parse User inputs
     from revenewCC.argparser import parser
     args = parser.parse_args()
@@ -122,63 +121,47 @@ def main():
 
     # Case 2: Non-SPR Client, Rolled Up
     elif filename is not None:
-        input_df = pd.read_csv(
-            filename, encoding='ISO-8859-1', low_memory=False)
-        expected_columns = [
-            'Supplier', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year']
+        input_df = pd.read_csv(filename, encoding='ISO-8859-1', low_memory=False)
+        expected_columns = ['Supplier', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year']
         inlist = [col in input_df.columns for col in expected_columns]
         if sum(inlist) != len(expected_columns):
-            missinglist = [
-                col for col in expected_columns if col not in input_df.columns]
-            logging.info(
-                f'The following columns were expected but not found: {missinglist}..')
+            missinglist = [col for col in expected_columns if col not in input_df.columns]
+            logging.info(f'The following columns were expected but not found: {missinglist}..')
             raise SystemExit()
         input_df['Client'] = clientname
 
     # Case 3: Non-SPR Client, Raw
     elif filename2 is not None:
-        temp_df = pd.read_csv(
-            filename2, encoding='ISO-8859-1', low_memory=False)
-        expected_columns = ['Vendor Name',
-                            'Invoice Date', 'Gross Invoice Amount']
+        temp_df = pd.read_csv(filename2, encoding='ISO-8859-1', low_memory=False)
+        expected_columns = ['Vendor Name', 'Invoice Date', 'Gross Invoice Amount']
         inlist = [col in temp_df.columns for col in expected_columns]
         if sum(inlist) != len(expected_columns):
-            missinglist = [
-                col for col in expected_columns if col not in temp_df.columns]
-            logging.info(
-                f'The following columns were expected but not found: {missinglist}..')
+            missinglist = [col for col in expected_columns if col not in temp_df.columns]
+            logging.info(f'The following columns were expected but not found: {missinglist}..')
             raise SystemExit()
-        temp_df = temp_df[expected_columns].rename(
-            columns={'Vendor Name': 'Supplier', })
+        temp_df = temp_df[expected_columns].rename(columns={'Vendor Name': 'Supplier', })
         temp_df['Year'] = pd.to_datetime(temp_df['Invoice Date']).dt.year
-        sums = temp_df.groupby(['Supplier', 'Year'], as_index=False)[
-            'Gross Invoice Amount'].sum()
-        counts = temp_df.groupby(['Supplier', 'Year'], as_index=False)[
-            'Invoice Date'].agg(np.size)
+        sums = temp_df.groupby(['Supplier', 'Year'], as_index=False)['Gross Invoice Amount'].sum()
+        counts = temp_df.groupby(['Supplier', 'Year'], as_index=False)['Invoice Date'].agg(np.size)
         input_df = pd.merge(sums, counts, on=['Supplier', 'Year']).rename(
             columns={'Gross Invoice Amount': 'Total_Invoice_Amount', 'Invoice Date': 'Total_Invoice_Count', })
         input_df['Client'] = clientname
 
     # Null case
     else:
-        logging.info(
-            'Sorry, something went wrong loading the new client data...')
+        logging.info('Sorry, something went wrong loading the new client data...')
         raise SystemExit()
 
     # Get average invoice amount
     logging.info('\nPreparing data for analysis...')
     input_df = input_df.dropna().reset_index(drop=True)
-    input_df['Total_Invoice_Count'] = input_df.Total_Invoice_Count.fillna(
-        0).astype(int, errors='ignore')
-    input_df['Total_Invoice_Amount'] = input_df.Total_Invoice_Count.fillna(
-        0).astype(float, errors='ignore')
+    input_df['Total_Invoice_Count'] = input_df.Total_Invoice_Count.fillna(0).astype(int, errors='ignore')
+    input_df['Total_Invoice_Amount'] = input_df.Total_Invoice_Count.fillna(0).astype(float, errors='ignore')
     input_df['Year'] = input_df.Year.fillna(0).astype(int).astype(str)
-    input_df['Avg_Invoice_Size'] = input_df['Total_Invoice_Amount'].div(
-        input_df['Total_Invoice_Count'])
+    input_df['Avg_Invoice_Size'] = input_df['Total_Invoice_Amount'].div(input_df['Total_Invoice_Count'])
 
     # Clean up the supplier name string
-    input_df['Cleaned'] = [helpers.clean_up_string(
-        s) for s in input_df.Supplier.fillna('')]
+    input_df['Cleaned'] = [helpers.clean_up_string(s) for s in input_df.Supplier.fillna('')]
 
     # Create unique list of suppliers
     logging.info('\nCreating unique list of suppliers...')
@@ -187,14 +170,10 @@ def main():
     # Merge input data with crossref
     logging.info('\nMatching supplier names against cross-reference file...')
 
-    combined = pd.merge(suppliers, xref_list, on='Supplier',
-                        how='outer', indicator=True)
-    unmatched = combined[combined['_merge'] == 'left_only'].drop(
-        columns=['_merge', 'Supplier_ref'])
-    matched = combined[combined['_merge'] == 'both'].drop(
-        columns=['_merge', 'Cleaned'])
-    count_total, count_matched, count_unmatched = len(
-        combined), len(matched), len(unmatched)
+    combined = pd.merge(suppliers, xref_list, on='Supplier', how='outer', indicator=True)
+    unmatched = combined[combined['_merge'] == 'left_only'].drop(columns=['_merge', 'Supplier_ref'])
+    matched = combined[combined['_merge'] == 'both'].drop(columns=['_merge', 'Cleaned'])
+    count_total, count_matched, count_unmatched = len(combined), len(matched), len(unmatched)
 
     # Print info about the matching
     logging.info(f'\tTotal suppliers: {count_total}')
@@ -219,8 +198,7 @@ def main():
             candidates[s] = k
 
     count_softmatch = len(candidates)
-    logging.info(
-        f'\tFound potential soft-matches for {count_softmatch} suppliers')
+    logging.info(f'\tFound potential soft-matches for {count_softmatch} suppliers')
 
     #  Todo: deal with cases where there is more than one softmatch--now just taking the first highest one...
     match_dict = {item[0]: item[1][0] for item in candidates.items()}
@@ -232,18 +210,14 @@ def main():
 
     if len(best_matches) > 0:
         # Combine softmatches with unmatched suppliers
-        soft_matched = unmatched.merge(
-            best_matches[['Supplier', 'Supplier_ref']], on='Supplier', how='left')
+        soft_matched = unmatched.merge(best_matches[['Supplier', 'Supplier_ref']], on='Supplier', how='left')
         # soft_matched['Supplier_ref'].fillna(value=soft_matched['Cleaned'], inplace=True)
         soft_matched.drop(columns='Cleaned', inplace=True)
         # Add best matches back to supplier list
-        xref = pd.concat([matched, soft_matched], axis=0,
-                         sort=True, ignore_index=True)
-        final_df = input_df.merge(xref, on='Supplier', how='left').drop(
-            columns='Cleaned')[keep_cols]
+        xref = pd.concat([matched, soft_matched], axis=0, sort=True, ignore_index=True)
+        final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')[keep_cols]
     else:
-        final_df = input_df.merge(xref, on='Supplier', how='left').drop(
-            columns='Cleaned')[keep_cols]
+        final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')[keep_cols]
 
     # Scorecard computations
     logging.info('\nCalculating supplier scores based on scorecard...')
@@ -255,34 +229,25 @@ def main():
 
     # STEP 8c-1: get the Spend sub-dataframe
     sc_df_spend = sc_df.loc[sc_df['Factor'] == 'Spend'].reset_index()
-    sc_df_spend = (
-        sc_df_spend.loc[sc_df_spend['Total_Invoice_Amount'] < sc_df_spend['Max']])
-    sc_df_spend = (
-        sc_df_spend.loc[sc_df_spend['Total_Invoice_Amount'] > sc_df_spend['Min']])
+    sc_df_spend = (sc_df_spend.loc[sc_df_spend['Total_Invoice_Amount'] < sc_df_spend['Max']])
+    sc_df_spend = (sc_df_spend.loc[sc_df_spend['Total_Invoice_Amount'] > sc_df_spend['Min']])
     sc_df_spend = sc_df_spend.reset_index()
 
     # STEP 8c-2: #get the InvoiceSize sub-dataframe
-    sc_df_invoicesize = sc_df.loc[sc_df['Factor']
-                                  == 'InvoiceSize'].reset_index()
-    sc_df_invoicesize = (
-        sc_df_invoicesize.loc[sc_df_invoicesize['Avg_Invoice_Size'] < sc_df_invoicesize['Max']])
-    sc_df_invoicesize = (
-        sc_df_invoicesize.loc[sc_df_invoicesize['Avg_Invoice_Size'] > sc_df_invoicesize['Min']])
+    sc_df_invoicesize = sc_df.loc[sc_df['Factor'] == 'InvoiceSize'].reset_index()
+    sc_df_invoicesize = (sc_df_invoicesize.loc[sc_df_invoicesize['Avg_Invoice_Size'] < sc_df_invoicesize['Max']])
+    sc_df_invoicesize = (sc_df_invoicesize.loc[sc_df_invoicesize['Avg_Invoice_Size'] > sc_df_invoicesize['Min']])
     sc_df_invoicesize = sc_df_invoicesize.reset_index()
 
     # STEP 8c-3: #get the InvoiceCount sub-dataframe
-    sc_df_invoicecount = sc_df.loc[sc_df['Factor']
-                                   == 'InvoiceCount'].reset_index()
-    sc_df_invoicecount = sc_df_invoicecount.loc[sc_df_invoicecount['Total_Invoice_Count']
-                                                < sc_df_invoicecount['Max']]
-    sc_df_invoicecount = sc_df_invoicecount.loc[sc_df_invoicecount['Total_Invoice_Count']
-                                                > sc_df_invoicecount['Min']]
+    sc_df_invoicecount = sc_df.loc[sc_df['Factor'] == 'InvoiceCount'].reset_index()
+    sc_df_invoicecount = sc_df_invoicecount.loc[sc_df_invoicecount['Total_Invoice_Count'] < sc_df_invoicecount['Max']]
+    sc_df_invoicecount = sc_df_invoicecount.loc[sc_df_invoicecount['Total_Invoice_Count'] > sc_df_invoicecount['Min']]
     sc_df_invoicecount = sc_df_invoicecount.reset_index()
 
     # STEP 8c-4: get the Commodity sub-dataframe
     sc_df_commodity = sc_df.loc[sc_df['Factor'] == 'Commodity'].reset_index()
-    sc_df_commodity = (
-        sc_df_commodity.loc[sc_df_commodity['Commodity'] == sc_df_commodity['Tier']])
+    sc_df_commodity = (sc_df_commodity.loc[sc_df_commodity['Commodity'] == sc_df_commodity['Tier']])
     sc_df_commodity = sc_df_commodity.reset_index()
 
     # STEP 8d: # append all the factor scores
@@ -290,24 +255,20 @@ def main():
         columns=['level_0', 'index'])
 
     # score at supplier-year-factor-tier level  Fixme: remove min/max cols
-    factor_scores = scores.groupby(
-        ['Supplier_ref', 'Year', 'Factor']).sum().stack().unstack().drop(columns=['Min', 'Max'])
+    factor_scores = scores.groupby(['Supplier_ref', 'Year', 'Factor']).sum().stack().unstack().drop(
+        columns=['Min', 'Max'])
 
     # score at supplier-year level
-    year_scores = scores.groupby(
-        ['Supplier_ref', 'Year']).sum().stack().unstack().unstack(level=1).drop(columns=['Min', 'Max'])
+    year_scores = scores.groupby(['Supplier_ref', 'Year']).sum().stack().unstack().unstack(level=1).drop(
+        columns=['Min', 'Max'])
     logging.info(f'\nWriting output file to {outputdir}...')
 
     # Create a Pandas Excel writer using XlsxWriter as the engine.
-    writer = pd.ExcelWriter(
-        f'{outputdir}/{clientname}_CC_Audit_Scorecard.xlsx', engine='xlsxwriter')
+    writer = pd.ExcelWriter(f'{outputdir}/{clientname}_CC_Audit_Scorecard.xlsx', engine='xlsxwriter')
     input_df.to_excel(writer, sheet_name='Raw_Data', index=False)
-    matched.to_excel(
-        writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
-    unmatched.to_excel(
-        writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
-    best_matches.to_excel(
-        writer, sheet_name='SoftMatched_Suppliers', index=False)
+    matched.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
+    unmatched.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
+    best_matches.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
     scores.to_excel(writer, sheet_name='SupplierScoreCard', index=False)
     factor_scores.to_excel(writer, sheet_name='Component_Scores')
     year_scores.to_excel(writer, sheet_name='Year_Scores')
@@ -316,8 +277,7 @@ def main():
     # Stop timer
     end = timer()
     elapsed = end - start
-    logging.info('\nDONE!\n\nApplication finished in {:.2f} seconds ... ({})'.format(
-        elapsed, time.ctime()))
+    logging.info('\nDONE!\n\nApplication finished in {:.2f} seconds ... ({})'.format(elapsed, time.ctime()))
 
 
 if __name__ == '__main__':
