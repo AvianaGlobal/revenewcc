@@ -179,7 +179,8 @@ def main():
     # Data processing
     logging.info('\nPreparing data for analysis...')
     input_df = input_df.dropna().reset_index(drop=True)
-    input_df['Total_Invoice_Count'] = input_df.Total_Invoice_Count.fillna(0).astype(int)
+    input_df['Total_Invoice_Count'] = input_df.Total_Invoice_Count.fillna(0).astype(int, errors='coerce')
+    input_df['Total_Invoice_Amount'] = input_df.Total_Invoice_Count.fillna(0).astype(float, errors='coerce')
     input_df['Year'] = input_df.Year.fillna(0).astype(int).astype(str)
     input_df['Avg_Invoice_Size'] = input_df['Total_Invoice_Amount'] / input_df['Total_Invoice_Count']
 
