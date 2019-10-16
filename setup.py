@@ -12,7 +12,7 @@ setup(
         'sqlalchemy',
         'pillow',
         'pyodbc',
-        'python-Levenshtein',
+        'python-Levenshtein-wheels',
         'tqdm',
         'wxpython',
         'xlsxwriter',
