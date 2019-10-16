@@ -203,9 +203,10 @@ def main():
 
     #  Todo: deal with cases where there is more than one softmatch--now just taking the first highest one...
     match_dict = {item[0]: item[1][0] for item in candidates.items()}
-    best_matches = pd.DataFrame.from_dict(match_dict)
-    best_matches.merge(suppliers, left_index=True, right_on='Cleaned').rename(
+    best_matches = pd.DataFrame(match_dict).transpose.merge(suppliers, left_index=True, right_on='Cleaned').rename(
         columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) 
+
+    keep_cols = ['Supplier', 'Supplier_ref', 'Commodity', 'Client', 'Year', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Avg_Invoice_Size']
 
     if len(best_matches) > 0:
         # Combine softmatches with unmatched suppliers
