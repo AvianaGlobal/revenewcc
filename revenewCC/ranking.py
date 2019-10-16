@@ -211,7 +211,7 @@ def main():
     # Find candidate matches with score above threshold
     candidates = {}
     for i, s in enumerate(unmatched_series):
-        prog = round(100 * ((i + 1) / count_unmatched), 2)
+        # prog = round(100 * ((i + 1) / count_unmatched), 2)
         d = {r: fuzz.ratio(s, r) for r in reference_series}
         if max(d.values()) > threshold:
             k = helpers.keys_with_top_values(d)
