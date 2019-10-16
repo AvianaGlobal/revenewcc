@@ -37,7 +37,7 @@ def main():
     port = '51949'
     user = 'sa'
     password = 'Aviana$92821'
-    
+
     # dsn = 'cc'
     # database = 'RevenewTest'
 
@@ -239,11 +239,11 @@ def main():
         # Add best matches back to supplier list
         xref = pd.concat([matched, soft_matched], axis=0,
                          sort=True, ignore_index=True)
-        final_df = input_df.merge(xref, on='Supplier').drop(
-            columns='Cleaned', how='left')[keep_cols]
+        final_df = input_df.merge(xref, on='Supplier', how='left').drop(
+            columns='Cleaned')[keep_cols]
     else:
-        final_df = input_df.merge(xref, on='Supplier').drop(
-            columns='Cleaned', how='left')[keep_cols]
+        final_df = input_df.merge(xref, on='Supplier', how='left').drop(
+            columns='Cleaned')[keep_cols]
 
     # Scorecard computations
     logging.info('\nCalculating supplier scores based on scorecard...')
