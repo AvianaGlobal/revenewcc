@@ -40,7 +40,7 @@ def main():
 
     # Set up data connection
     import os  # Backdoor for developer
-    if os.environ['USER'] == 'mj':
+    if os.environ['USER'] == 'mj' or os.environ['USERNAME'] == 'mj':
         import sys
         host = '208.43.250.18'
         port = '51949'
