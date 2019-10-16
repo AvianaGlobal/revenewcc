@@ -44,8 +44,7 @@ def main():
     if sys.platform == 'darwin' and os.environ['USER'] == 'mj':
         driver = '/usr/local/lib/libmsodbcsql.13.dylib'
         cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    elif sys.platform == 'win32' and os.environ['USERNAME'] in ['mj', 'MichaelJohnson']:
-        driver = "C:\Windows\System32\sqlsrv32.dll"
+    else:
         cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
 
     # Make database connection engine
@@ -290,11 +289,11 @@ def main():
 
     # score at supplier-year-factor-tier level  Fixme: remove min/max cols
     factor_scores = scores.groupby(
-        ['Supplier_ref', 'Year', 'Factor']).sum().stack().unstack()
+        ['Supplier_ref', 'Year', 'Factor']).sum().stack().unstack().drop(columns=['Min', 'Max'])
 
     # score at supplier-year level
     year_scores = scores.groupby(
-        ['Supplier_ref', 'Year']).sum().stack().unstack().unstack(level=1)
+        ['Supplier_ref', 'Year']).sum().stack().unstack().unstack(level=1).drop(columns=['Min', 'Max'])
     logging.info(f'\nWriting output file to {outputdir}...')
 
     # Create a Pandas Excel writer using XlsxWriter as the engine.
