@@ -1,6 +1,8 @@
+import sys
+import sqlite3
 import pandas as pd
 from tqdm import tqdm
-import sys
+
 
 def dbconnect():
     # Monkey patch for macOS
@@ -25,7 +27,6 @@ def dbconnect():
 
 
 def sqliteconnect():
-    import sqlite3
     return sqlite3.connect('revenewCC/inputdata/revenewCC.db')
 
 # Set up data connection
