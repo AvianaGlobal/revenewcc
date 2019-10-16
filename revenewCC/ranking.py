@@ -51,7 +51,8 @@ def main():
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
         else:
             driver = '{SQL Server}'
-            cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'  # cnxn_str = f'mssql+pyodbc://@{dsn}'
+            cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+        # database = None  # cnxn_str = f'mssql+pyodbc://@{dsn}'
 
     # Make database connection engine
     from sqlalchemy import create_engine
