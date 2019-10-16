@@ -15,7 +15,6 @@ def main():
     outputdir = args.outputdir
     threshold = 89
 
-    import os
     import time
     import logging
     import numpy as np
@@ -37,8 +36,6 @@ def main():
     #
     # from revenewCC.defaults import database, clientname, filename, filename2, outputdir
     #
-
-    # Set up data connection
     import os  # Backdoor for developer
     import sys
     if sys.platform == 'darwin':
@@ -58,15 +55,15 @@ def main():
             password = 'Aviana$92821'
             database = 'AvianaML'
             driver = "C:/Windows/System32/sqlsrv32.dll"
+            # cnxn_str = f'mssql+pyodbc://@{dsn}'
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    else:
-        cnxn_str = f'mssql+pyodbc://@{dsn}'
+    database = args.database
 
     # Make database connection engine
     from sqlalchemy import create_engine
 
     # Options below are useful for debugging
-    engine = create_engine(cnxn_str)
+    engine = create_engine(cnxn_str, fast_executemany=True)
     engine.connect()
 
     # Set up logging
@@ -92,10 +89,11 @@ def main():
         ['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')[['Supplier_ref', 'Commodity']]
 
     # clean up
-    comm_df["Commodity"].fillna("NOT_AVAILABLE", inplace=True).replace(
-        to_replace=["FACILITIES MAINTENANCE/SECURITY", "REMOVE", "STAFF AUGMENTATION",
-                    "INSPECTION/MONITORING/LAB SERVICES", "TELECOMMUNICATIONS", "METER READING SERVICES",
-                    "CHEMICALS/ADDITIVES/INDUSTRIAL GAS", ], value="SMALL_COUNT_COMM_GROUPS", inplace=True)
+    comm_df["Commodity"] = comm_df["Commodity"].fillna("NOT_AVAILABLE")
+    comm_df["Commodity"].replace(to_replace=["FACILITIES MAINTENANCE/SECURITY", "REMOVE", "STAFF AUGMENTATION",
+                                             "INSPECTION/MONITORING/LAB SERVICES", "TELECOMMUNICATIONS",
+                                             "METER READING SERVICES", "CHEMICALS/ADDITIVES/INDUSTRIAL GAS", ],
+                                 value="SMALL_COUNT_COMM_GROUPS", inplace=True)
 
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
@@ -230,25 +228,28 @@ def main():
             candidates[s] = k  # print(f'{i + 1}/{count_unmatched} ({prog}%)', end='\r', flush=True)
 
     count_softmatch = len(candidates)
-    logging.info(f'\tFound potential soft-matches for {count_softmatch} supplier(s)')
+    logging.info(f'\tFound potential soft-matches for {count_softmatch} suppliers')
 
     #  Todo: deal with cases where there is more than one softmatch--now just taking the first highest one...
     match_dict = {item[0]: item[1][0] for item in candidates.items()}
     best_matches = pd.DataFrame(match_dict).T.merge(suppliers, left_index=True, right_on='Cleaned').rename(
         columns={0: 'Supplier_ref', 1: 'Softmatch_Score'})  # Fixme: is there an arg to DF to avoid T...?
 
-    # Combine softmatches with unmatched suppliers
-    soft_matched = unmatched.merge(best_matches[['Supplier', 'Supplier_ref']], on='Supplier', how='left')
-    # soft_matched['Supplier_ref'].fillna(value=soft_matched['Cleaned'], inplace=True)
-    soft_matched.drop(columns='Cleaned', inplace=True)
-
-    # Add best matches back to supplier list
-    xref = pd.concat([matched, soft_matched], axis=0, sort=True, ignore_index=True).merge(comm_df, on='Supplier_ref')
-
     keep_cols = ['Supplier', 'Supplier_ref', 'Commodity', 'Client', 'Year', 'Total_Invoice_Amount',
                  'Total_Invoice_Count', 'Avg_Invoice_Size']
 
-    final_df = input_df.merge(xref, on='Supplier').drop(columns='Cleaned')[keep_cols]
+    if len(best_matches) > 0:
+        # Combine softmatches with unmatched suppliers
+        soft_matched = unmatched.merge(best_matches[['Supplier', 'Supplier_ref']], on='Supplier', how='left')
+        # soft_matched['Supplier_ref'].fillna(value=soft_matched['Cleaned'], inplace=True)
+        soft_matched.drop(columns='Cleaned', inplace=True)
+        # Add best matches back to supplier list
+        xref = pd.concat([matched, soft_matched], axis=0, sort=True, ignore_index=True)
+        xref = xref.merge(comm_df, on='Supplier_ref', )
+        final_df = input_df.merge(xref, on='Supplier').drop(columns='Cleaned')[keep_cols]
+    else:
+        xref = matched.merge(comm_df, on='Supplier_ref', )
+        final_df = input_df.merge(xref, on='Supplier').drop(columns='Cleaned')[keep_cols]
 
     # Scorecard computations
     logging.info('\nCalculating supplier scores based on scorecard...')
