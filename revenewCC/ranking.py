@@ -228,7 +228,6 @@ def main():
     best_matches = pd.DataFrame(match_dict).T.merge(suppliers, left_index=True, right_on='Cleaned').rename(
         columns={0: 'Supplier_ref', 1: 'Softmatch_Score'})  # Fixme: is there an arg to DF to avoid T...?
 
-
     keep_cols = ['Supplier', 'Supplier_ref', 'Commodity', 'Client', 'Year', 'Total_Invoice_Amount',
                  'Total_Invoice_Count', 'Avg_Invoice_Size']
 
@@ -242,7 +241,7 @@ def main():
         xref = xref.merge(comm_df, on='Supplier_ref', )
         final_df = input_df.merge(xref, on='Supplier').drop(columns='Cleaned')[keep_cols]
     else:
-        xref = matched.merge(comm_df, on='Supplier_ref',)
+        xref = matched.merge(comm_df, on='Supplier_ref', )
         final_df = input_df.merge(xref, on='Supplier').drop(columns='Cleaned')[keep_cols]
 
     # Scorecard computations
