@@ -69,17 +69,6 @@ def main():
     comm_list = pd.read_pickle('revenewCC/inputdata/commodities.pkl')
     scorecard = pd.read_pickle('revenewCC/inputdata/scorecard.pkl')
 
-    # Merge crossref and commodities
-    comm_df = pd.merge(xref_list, comm_list, on=['Supplier'], how='left').groupby(
-        ['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')[['Supplier_ref', 'Commodity']]
-
-    # clean up
-    comm_df["Commodity"] = comm_df["Commodity"].fillna("NOT_AVAILABLE")
-    comm_df["Commodity"].replace(to_replace=["FACILITIES MAINTENANCE/SECURITY", "REMOVE", "STAFF AUGMENTATION",
-                                             "INSPECTION/MONITORING/LAB SERVICES", "TELECOMMUNICATIONS",
-                                             "METER READING SERVICES", "CHEMICALS/ADDITIVES/INDUSTRIAL GAS", ],
-                                 value="SMALL_COUNT_COMM_GROUPS", inplace=True)
-
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
     # Case 1: SPR Client
@@ -182,7 +171,7 @@ def main():
     logging.info(f'\nTrying to soft-match the unmatched suppliers...')
 
     unmatched_series = unmatched['Cleaned']
-    reference_series = comm_df['Supplier_ref']
+    reference_series = xref_list['Supplier_ref']
 
     # Find candidate matches with score above threshold
     candidates = {}
@@ -202,22 +191,32 @@ def main():
 
     #  Todo: deal with cases where there is more than one softmatch--now just taking the first highest one...
     match_dict = {item[0]: item[1][0] for item in candidates.items()}
-    best_matches = pd.DataFrame(match_dict).T.merge(suppliers, left_index=True, right_on='Cleaned').rename(
-        columns={0: 'Supplier_ref', 1: 'Softmatch_Score'})  # Fixme: is there an arg to DF to avoid T...?
+    best_matches = pd.DataFrame.from_dict(match_dict)
+    best_matches.merge(suppliers, left_index=True, right_on='Cleaned').rename(
+        columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) 
 
     keep_cols = ['Supplier', 'Supplier_ref', 'Commodity', 'Client', 'Year', 'Total_Invoice_Amount',
                  'Total_Invoice_Count', 'Avg_Invoice_Size']
 
     if len(best_matches) > 0:
         # Combine softmatches with unmatched suppliers
-        soft_matched = unmatched.merge(best_matches[['Supplier', 'Supplier_ref']], on='Supplier', how='left')
-        # soft_matched['Supplier_ref'].fillna(value=soft_matched['Cleaned'], inplace=True)
-        soft_matched.drop(columns='Cleaned', inplace=True)
+        soft_matched = unmatched.merge(best_matches[['Supplier', 'Supplier_ref']], on='Supplier', how='left').drop(columns='Cleaned')
         # Add best matches back to supplier list
         xref = pd.concat([matched, soft_matched], axis=0, sort=True, ignore_index=True)
-        final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')[keep_cols]
+        final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')
     else:
-        final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')[keep_cols]
+        final_df = input_df.merge(matched, on='Supplier', how='left').drop(columns='Cleaned')
+
+    # Merge crossref and commodities
+    comm_df = pd.merge(xref_list, comm_list, on=['Supplier'], how='left').groupby(
+        ['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')[['Supplier_ref', 'Commodity']]
+
+    # clean up
+    comm_df["Commodity"] = comm_df["Commodity"].fillna("NOT_AVAILABLE")
+    comm_df["Commodity"].replace(to_replace=["FACILITIES MAINTENANCE/SECURITY", "REMOVE", "STAFF AUGMENTATION",
+                                             "INSPECTION/MONITORING/LAB SERVICES", "TELECOMMUNICATIONS",
+                                             "METER READING SERVICES", "CHEMICALS/ADDITIVES/INDUSTRIAL GAS", ],
+                                 value="SMALL_COUNT_COMM_GROUPS", inplace=True)
 
     # Scorecard computations
     logging.info('\nCalculating supplier scores based on scorecard...')
