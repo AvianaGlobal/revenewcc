@@ -1,9 +1,9 @@
 dsn = "cc"
 database = None
-clientname = 'QEP'
+clientname = 'Chemours'
 driver = "/usr/local/lib/libmsodbcsql.13.dylib"
 filename = "/Users/mj/Downloads/Chemoursrolledup.csv"
-filename2 = "revenewCC/inputdata/TestNonSPR_Raw.csv"
+# filename2 = "revenewCC/inputdata/TestNonSPR_Raw.csv"
 outputdir = "/Users/mj/Desktop/"
 host = '208.43.250.18'
 port = '51949'
