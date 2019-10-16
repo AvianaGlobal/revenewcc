@@ -85,7 +85,7 @@ def main():
     comm_df["Commodity"].replace(to_replace=["FACILITIES MAINTENANCE/SECURITY", "REMOVE", "STAFF AUGMENTATION",
                                              "INSPECTION/MONITORING/LAB SERVICES", "TELECOMMUNICATIONS",
                                              "METER READING SERVICES", "CHEMICALS/ADDITIVES/INDUSTRIAL GAS", ],
-        value="SMALL_COUNT_COMM_GROUPS", inplace=True)
+                                 value="SMALL_COUNT_COMM_GROUPS", inplace=True)
 
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
@@ -166,7 +166,7 @@ def main():
     input_df['Total_Invoice_Count'] = input_df.Total_Invoice_Count.fillna(0).astype(int, errors='ignore')
     input_df['Total_Invoice_Amount'] = input_df.Total_Invoice_Count.fillna(0).astype(float, errors='ignore')
     input_df['Year'] = input_df.Year.fillna(0).astype(int).astype(str)
-    input_df['Avg_Invoice_Size'] = input_df['Total_Invoice_Amount'] / input_df['Total_Invoice_Count']
+    input_df['Avg_Invoice_Size'] = input_df['Total_Invoice_Amount'].div(input_df['Total_Invoice_Count'])
 
     # Clean up the supplier name string
     input_df['Cleaned'] = [helpers.clean_up_string(s) for s in input_df.Supplier.fillna('')]
@@ -197,13 +197,13 @@ def main():
     for i, s in enumerate(unmatched_series):
         prog = round(100 * ((i + 1) / count_unmatched), 1)
         d = {r: fuzz.ratio(s, r) for r in reference_series}
+        if i % 250 == 0:
+            out = f'{i} complete of {count_unmatched} ({prog}%)'
+            logging.info(out)
         if max(d.values()) > threshold:
             k = helpers.keys_with_top_values(d)
             # print(f'{s} = {k[0][0]}...?')
             candidates[s] = k
-        if i % 250 == 0:
-            out = f'{i} complete of {count_unmatched} ({prog}%)'
-            logging.info(out)
 
     count_softmatch = len(candidates)
     logging.info(f'\tFound potential soft-matches for {count_softmatch} suppliers')
@@ -272,7 +272,7 @@ def main():
     logging.info(f'\nWriting output file to {outputdir}...')
 
     # Create a Pandas Excel writer using XlsxWriter as the engine.
-    writer = pd.ExcelWriter(f'{outputdir}/CC_Audit_Scorecard.xlsx', engine='xlsxwriter')
+    writer = pd.ExcelWriter(f'{outputdir}/{clientname}_CC_Audit_Scorecard.xlsx', engine='xlsxwriter')
     input_df.to_excel(writer, sheet_name='Raw_Data', index=False)
     matched.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
     unmatched.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
