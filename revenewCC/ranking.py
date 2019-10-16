@@ -40,17 +40,23 @@ def main():
 
     # Set up data connection
     import os  # Backdoor for developer
-    if os.environ['USER'] == 'mj' or os.environ['USERNAME'] == 'mj':
-        import sys
-        host = '208.43.250.18'
-        port = '51949'
-        user = 'sa'
-        password = 'Aviana$92821'
-        database = 'AvianaML'
-        if sys.platform == 'darwin':
+    import sys
+    if sys.platform == 'darwin':
+        if os.environ['USER'] == 'mj':
+            host = '208.43.250.18'
+            port = '51949'
+            user = 'sa'
+            password = 'Aviana$92821'
+            database = 'AvianaML'
             driver = '/usr/local/lib/libmsodbcsql.13.dylib'
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-        else:
+    elif sys.platform == 'nt':
+        if os.environ['USERNAME'] == 'mj':
+            host = '208.43.250.18'
+            port = '51949'
+            user = 'sa'
+            password = 'Aviana$92821'
+            database = 'AvianaML'
             driver = '{SQL Server}'
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
             # cnxn_str = f'mssql+pyodbc://@{dsn}'
