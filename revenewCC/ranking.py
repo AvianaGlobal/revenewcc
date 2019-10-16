@@ -50,7 +50,7 @@ def main():
             database = 'AvianaML'
             driver = '/usr/local/lib/libmsodbcsql.13.dylib'
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    elif sys.platform == 'nt':
+    elif sys.platform == 'win32':
         if os.environ['USERNAME'] == 'mj':
             host = '208.43.250.18'
             port = '51949'
@@ -59,7 +59,8 @@ def main():
             database = 'AvianaML'
             driver = '{SQL Server}'
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-            # cnxn_str = f'mssql+pyodbc://@{dsn}'
+    else:
+        cnxn_str = f'mssql+pyodbc://@{dsn}'
 
     # Make database connection engine
     from sqlalchemy import create_engine
