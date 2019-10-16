@@ -69,6 +69,18 @@ def main():
     comm_list = pd.read_pickle('revenewCC/inputdata/commodities.pkl')
     scorecard = pd.read_pickle('revenewCC/inputdata/scorecard.pkl')
 
+    # Merge crossref and commodities
+    comm_df = pd.merge(xref_list, comm_list, on=['Supplier'], how='left').groupby(
+        ['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')[['Supplier_ref', 'Commodity']]
+
+    # clean up
+    comm_df["Commodity"] = comm_df["Commodity"].fillna("NOT_AVAILABLE")
+    comm_df["Commodity"].replace(to_replace=["FACILITIES MAINTENANCE/SECURITY", "REMOVE", "STAFF AUGMENTATION",
+                                             "INSPECTION/MONITORING/LAB SERVICES", "TELECOMMUNICATIONS",
+                                             "METER READING SERVICES", "CHEMICALS/ADDITIVES/INDUSTRIAL GAS", ],
+                                 value="SMALL_COUNT_COMM_GROUPS", inplace=True)
+
+
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
     # Case 1: SPR Client
@@ -171,7 +183,7 @@ def main():
     logging.info(f'\nTrying to soft-match the unmatched suppliers...')
 
     unmatched_series = unmatched['Cleaned']
-    reference_series = xref_list['Supplier_ref']
+    reference_series = comm_df['Supplier_ref']
 
     # Find candidate matches with score above threshold
     candidates = {}
@@ -195,9 +207,6 @@ def main():
     best_matches.merge(suppliers, left_index=True, right_on='Cleaned').rename(
         columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) 
 
-    keep_cols = ['Supplier', 'Supplier_ref', 'Commodity', 'Client', 'Year', 'Total_Invoice_Amount',
-                 'Total_Invoice_Count', 'Avg_Invoice_Size']
-
     if len(best_matches) > 0:
         # Combine softmatches with unmatched suppliers
         soft_matched = unmatched.merge(best_matches[['Supplier', 'Supplier_ref']], on='Supplier', how='left').drop(columns='Cleaned')
@@ -206,17 +215,6 @@ def main():
         final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')
     else:
         final_df = input_df.merge(matched, on='Supplier', how='left').drop(columns='Cleaned')
-
-    # Merge crossref and commodities
-    comm_df = pd.merge(xref_list, comm_list, on=['Supplier'], how='left').groupby(
-        ['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')[['Supplier_ref', 'Commodity']]
-
-    # clean up
-    comm_df["Commodity"] = comm_df["Commodity"].fillna("NOT_AVAILABLE")
-    comm_df["Commodity"].replace(to_replace=["FACILITIES MAINTENANCE/SECURITY", "REMOVE", "STAFF AUGMENTATION",
-                                             "INSPECTION/MONITORING/LAB SERVICES", "TELECOMMUNICATIONS",
-                                             "METER READING SERVICES", "CHEMICALS/ADDITIVES/INDUSTRIAL GAS", ],
-                                 value="SMALL_COUNT_COMM_GROUPS", inplace=True)
 
     # Scorecard computations
     logging.info('\nCalculating supplier scores based on scorecard...')
