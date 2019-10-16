@@ -197,7 +197,7 @@ def main():
     combined = pd.merge(suppliers, xref_list, on='Supplier', how='outer', indicator=True)
     unmatched = combined[combined['_merge'] == 'left_only'].drop(columns=['_merge', 'Supplier_ref'])
     matched = combined[combined['_merge'] == 'both'].drop(columns=['_merge', 'Cleaned'])
-    count_total, count_matched, count_unmatched = len(suppliers), len(matched), len(unmatched)
+    count_total, count_matched, count_unmatched = len(combined), len(matched), len(unmatched)
 
     # Print info about the matching
     logging.info(f'\tTotal suppliers: {count_total}')
