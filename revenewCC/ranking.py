@@ -118,6 +118,7 @@ def main():
 """
         input_df = pd.read_sql(dataquery, engine)
         input_df['Client'] = clientname
+
     # Case 2: Non-SPR Client, Rolled Up
     elif filename is not None:
         input_df = pd.read_csv(
@@ -132,6 +133,7 @@ def main():
                 f'The following columns were expected but not found: {missinglist}..')
             raise SystemExit()
         input_df['Client'] = clientname
+
     # Case 3: Non-SPR Client, Raw
     elif filename2 is not None:
         temp_df = pd.read_csv(
@@ -155,13 +157,14 @@ def main():
         input_df = pd.merge(sums, counts, on=['Supplier', 'Year']).rename(
             columns={'Gross Invoice Amount': 'Total_Invoice_Amount', 'Invoice Date': 'Total_Invoice_Count', })
         input_df['Client'] = clientname
+
     # Null case
     else:
         logging.info(
             'Sorry, something went wrong loading the new client data...')
         raise SystemExit()
 
-    # Data processing
+    # Get average invoice amount
     logging.info('\nPreparing data for analysis...')
     input_df = input_df.dropna().reset_index(drop=True)
     input_df['Total_Invoice_Count'] = input_df.Total_Invoice_Count.fillna(
@@ -235,13 +238,11 @@ def main():
         # Add best matches back to supplier list
         xref = pd.concat([matched, soft_matched], axis=0,
                          sort=True, ignore_index=True)
-        xref = xref.merge(comm_df, on='Supplier_ref', )
         final_df = input_df.merge(xref, on='Supplier').drop(
-            columns='Cleaned')[keep_cols]
+            columns='Cleaned', how='left')[keep_cols]
     else:
-        xref = matched.merge(comm_df, on='Supplier_ref', )
         final_df = input_df.merge(xref, on='Supplier').drop(
-            columns='Cleaned')[keep_cols]
+            columns='Cleaned', how='left')[keep_cols]
 
     # Scorecard computations
     logging.info('\nCalculating supplier scores based on scorecard...')
