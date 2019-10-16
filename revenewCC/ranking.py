@@ -207,7 +207,7 @@ def main():
             # print(f'{s} = {k[0][0]}...?')
             candidates[s] = k
         if i % 250 == 0:
-            out = f'{i} complete of {count_unmatched} ({prog}%)'
+            out = f'{i  } complete of {count_unmatched} ({prog}%)'
             logging.info(out)
 
     count_softmatch = len(candidates)
