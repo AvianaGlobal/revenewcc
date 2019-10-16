@@ -57,7 +57,9 @@ def main():
             driver = "C:/Windows/System32/sqlsrv32.dll"
             # cnxn_str = f'mssql+pyodbc://@{dsn}'
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    database = args.database
+    else:
+        database = args.database
+        cnxn_str = f'mssql+pyodbc://@{dsn}'
 
     # Make database connection engine
     from sqlalchemy import create_engine
@@ -79,7 +81,7 @@ def main():
     logging.info(f'\nCurrent working directory: {os.getcwd()}')
     logging.info('\nSetting up workspace...')
 
-    # Read in all Resource Files
+    # Read in all Resource Files TODO update crossref
     xref_list = pd.read_pickle('revenewCC/inputdata/crossref.pkl')
     comm_list = pd.read_pickle('revenewCC/inputdata/commodities.pkl')
     scorecard = pd.read_pickle('revenewCC/inputdata/scorecard.pkl')
