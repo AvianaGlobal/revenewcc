@@ -38,18 +38,22 @@ def main():
     # from revenewCC.defaults import database, clientname, filename, filename2, outputdir
     #
 
-    import sys
     # Set up data connection
-    if sys.platform == 'darwin':
+    import os  # Backdoor for developer
+    if os.environ['USER'] == 'mj':
+        import sys
         host = '208.43.250.18'
         port = '51949'
         user = 'sa'
         password = 'Aviana$92821'
         database = 'AvianaML'
-        driver = '/usr/local/lib/libmsodbcsql.13.dylib'
-        cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    else:
-        cnxn_str = f'mssql+pyodbc://@{dsn}'
+        if sys.platform == 'darwin':
+            driver = '/usr/local/lib/libmsodbcsql.13.dylib'
+            cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+        else:
+            driver = '{SQL Server}'
+            cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+            # cnxn_str = f'mssql+pyodbc://@{dsn}'
 
     # Make database connection engine
     from sqlalchemy import create_engine

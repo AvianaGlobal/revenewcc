@@ -12,5 +12,6 @@ tests/
 /**/*.pyc
 /**/*.parquet
 /**/*.txt
-/**/*.csv
 /**/*.xlsx
+/revenewCC/inputdata/TestMissingColumns.csv
+/revenewCC/inputdata/QEP2019_invoice.csv
