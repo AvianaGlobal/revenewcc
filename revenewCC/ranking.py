@@ -31,14 +31,14 @@ def main():
     # Set default threshold for soft-matching
     threshold = 89
 
-    # Default database connection via ODBC
-    dsn = 'cc'
-    host = '208.43.250.18'
-    port = '51949'
-    user = 'sa'
-    password = 'Aviana$92821'
-    database = 'RevenewTest'
     # TODO: delete me!
+    # Default database connection via ODBC
+    # dsn = 'cc'
+    # host = '208.43.250.18'
+    # port = '51949'
+    # user = 'sa'
+    # password = 'Aviana$92821'
+    # database = 'RevenewTest'
 
     # Backdoor connection for developer
     if sys.platform == 'darwin' and os.environ['USER'] == 'mj':
