@@ -5,16 +5,6 @@ from gooey import Gooey
 @Gooey(program_name='\nRevenewML\nCC Supplier Ranking\n', default_size=(700, 700), image_dir='::gooey/default',
        language_dir='gooey/languages', )
 def main():
-    from revenewCC.argparser import parser
-    args = parser.parse_args()
-    dsn = args.dsn
-    clientname = args.clientname
-    database = args.database
-    filename = args.filename
-    filename2 = args.filename2
-    outputdir = args.outputdir
-    threshold = 89
-
     import os
     import sys
     import time
@@ -22,17 +12,22 @@ def main():
     import numpy as np
     import pandas as pd
     from fuzzywuzzy import fuzz
-    from timeit import default_timer as timer
     from sqlalchemy import create_engine
-
-    # ### For progress bar ###
-    #
-    # import io
-    # from contextlib import redirect_stderr
-    # from tqdm.auto import tqdm
-    #
-
+    from timeit import default_timer as timer
+    from revenewCC.argparser import parser
     from revenewCC import helpers
+
+    # Threshold for soft-matching
+    threshold = 89
+
+    # User inputs
+    args = parser.parse_args()
+    dsn = args.dsn
+    clientname = args.clientname
+    database = args.database
+    outputdir = args.outputdir
+    filename = args.filename
+    filename2 = args.filename2
 
     # Default database connection via ODBC
     from revenewCC.defaults import dsn
@@ -90,7 +85,7 @@ def main():
     comm_df["Commodity"].replace(to_replace=["FACILITIES MAINTENANCE/SECURITY", "REMOVE", "STAFF AUGMENTATION",
                                              "INSPECTION/MONITORING/LAB SERVICES", "TELECOMMUNICATIONS",
                                              "METER READING SERVICES", "CHEMICALS/ADDITIVES/INDUSTRIAL GAS", ],
-                                 value="SMALL_COUNT_COMM_GROUPS", inplace=True)
+        value="SMALL_COUNT_COMM_GROUPS", inplace=True)
 
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
@@ -207,7 +202,7 @@ def main():
             # print(f'{s} = {k[0][0]}...?')
             candidates[s] = k
         if i % 250 == 0:
-            out = f'{i  } complete of {count_unmatched} ({prog}%)'
+            out = f'{i} complete of {count_unmatched} ({prog}%)'
             logging.info(out)
 
     count_softmatch = len(candidates)
