@@ -5,6 +5,18 @@ from gooey import Gooey
 @Gooey(program_name='\nRevenewML\nCC Supplier Ranking\n', default_size=(700, 700), image_dir='::gooey/default',
        language_dir='gooey/languages', )
 def main():
+
+    # Parse User inputs
+    from revenewCC.argparser import parser
+    args = parser.parse_args()
+    dsn = args.dsn
+    clientname = args.clientname
+    database = args.database
+    outputdir = args.outputdir
+    filename = args.filename
+    filename2 = args.filename2
+
+    # Import packages
     import os
     import sys
     import time
@@ -14,45 +26,27 @@ def main():
     from fuzzywuzzy import fuzz
     from sqlalchemy import create_engine
     from timeit import default_timer as timer
-    from revenewCC.argparser import parser
     from revenewCC import helpers
 
-    # Threshold for soft-matching
+    # Set default threshold for soft-matching
     threshold = 89
 
-    # User inputs
-    args = parser.parse_args()
-    dsn = args.dsn
-    clientname = args.clientname
-    database = args.database
-    outputdir = args.outputdir
-    filename = args.filename
-    filename2 = args.filename2
-
     # Default database connection via ODBC
-    from revenewCC.defaults import dsn
-    cnxn_str = f'mssql+pyodbc://@{dsn}'
+    dsn = 'cc'
+    host = '208.43.250.18'
+    port = '51949'
+    user = 'sa'
+    password = 'Aviana$92821'
+    database = 'RevenewTest'
+    # TODO: delete me!
 
     # Backdoor connection for developer
     if sys.platform == 'darwin' and os.environ['USER'] == 'mj':
-        host = '208.43.250.18'
-        port = '51949'
-        user = 'sa'
-        password = 'Aviana$92821'
-        database = 'AvianaML'
         driver = '/usr/local/lib/libmsodbcsql.13.dylib'
         cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
     elif sys.platform == 'win32' and os.environ['USERNAME'] in ['mj', 'MichaelJohnson']:
-        host = '208.43.250.18'
-        port = '51949'
-        user = 'sa'
-        password = 'Aviana$92821'
-        database = 'AvianaML'
-        driver = 'C:/Windows/System32/sqlsrv32.dll'
-        cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-
-    # ### Use these default settigns for debugging
-    from revenewCC.defaults import database, clientname, filename, outputdir
+        driver = "C:\Windows\System32\sqlsrv32.dll"
+        cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
 
     # Make database connection engine
     engine = create_engine(cnxn_str, fast_executemany=True)
@@ -89,7 +83,6 @@ def main():
 
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
-
     # Case 1: SPR Client
     if database is not None:
         dataquery = f"""
@@ -126,7 +119,6 @@ def main():
 """
         input_df = pd.read_sql(dataquery, engine)
         input_df['Client'] = clientname
-
     # Case 2: Non-SPR Client, Rolled Up
     elif filename is not None:
         input_df = pd.read_csv(
@@ -141,7 +133,6 @@ def main():
                 f'The following columns were expected but not found: {missinglist}..')
             raise SystemExit()
         input_df['Client'] = clientname
-
     # Case 3: Non-SPR Client, Raw
     elif filename2 is not None:
         temp_df = pd.read_csv(
@@ -165,7 +156,6 @@ def main():
         input_df = pd.merge(sums, counts, on=['Supplier', 'Year']).rename(
             columns={'Gross Invoice Amount': 'Total_Invoice_Amount', 'Invoice Date': 'Total_Invoice_Count', })
         input_df['Client'] = clientname
-
     # Null case
     else:
         logging.info(

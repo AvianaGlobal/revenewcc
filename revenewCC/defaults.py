@@ -1,4 +1,4 @@
-dsn = "cc"
+dsn = "rev"
 database = None
 clientname = 'Chemours'
 driver = "/usr/local/lib/libmsodbcsql.13.dylib"
