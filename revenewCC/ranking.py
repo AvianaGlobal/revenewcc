@@ -15,12 +15,15 @@ def main():
     outputdir = args.outputdir
     threshold = 89
 
+    import os
+    import sys
     import time
     import logging
     import numpy as np
     import pandas as pd
     from fuzzywuzzy import fuzz
     from timeit import default_timer as timer
+    from sqlalchemy import create_engine
 
     # ### For progress bar ###
     #
@@ -30,41 +33,33 @@ def main():
     #
 
     from revenewCC import helpers
-    # from revenewCC.dbconnect import dbconnect
+
+    # Default database connection via ODBC
+    from revenewCC.defaults import dsn
+    cnxn_str = f'mssql+pyodbc://@{dsn}'
+
+    # Backdoor connection for developer
+    if sys.platform == 'darwin' and os.environ['USER'] == 'mj':
+        host = '208.43.250.18'
+        port = '51949'
+        user = 'sa'
+        password = 'Aviana$92821'
+        database = 'AvianaML'
+        driver = '/usr/local/lib/libmsodbcsql.13.dylib'
+        cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+    elif sys.platform == 'win32' and os.environ['USERNAME'] == 'mj':
+        host = '208.43.250.18'
+        port = '51949'
+        user = 'sa'
+        password = 'Aviana$92821'
+        database = 'AvianaML'
+        driver = 'C:/Windows/System32/sqlsrv32.dll'
+        cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
 
     # ### Use these default settigns for debugging
-    #
-    # from revenewCC.defaults import database, clientname, filename, filename2, outputdir
-    #
-    import os  # Backdoor for developer
-    import sys
-    if sys.platform == 'darwin':
-        if os.environ['USER'] == 'mj':
-            host = '208.43.250.18'
-            port = '51949'
-            user = 'sa'
-            password = 'Aviana$92821'
-            database = 'AvianaML'
-            driver = '/usr/local/lib/libmsodbcsql.13.dylib'
-            cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    elif sys.platform == 'win32':
-        if os.environ['USERNAME'] == 'mj':
-            host = '208.43.250.18'
-            port = '51949'
-            user = 'sa'
-            password = 'Aviana$92821'
-            database = 'AvianaML'
-            driver = "C:/Windows/System32/sqlsrv32.dll"
-            # cnxn_str = f'mssql+pyodbc://@{dsn}'
-            cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    else:
-        database = args.database
-        cnxn_str = f'mssql+pyodbc://@{dsn}'
+    from revenewCC.defaults import database, clientname, filename, outputdir
 
     # Make database connection engine
-    from sqlalchemy import create_engine
-
-    # Options below are useful for debugging
     engine = create_engine(cnxn_str, fast_executemany=True)
     engine.connect()
 
@@ -134,25 +129,12 @@ def main():
             GROUP BY Supplier, datename(YEAR, Invoice_Date)) 
             SELECT COUNT(*) as Count FROM df             
 """
-        input_df = pd.DataFrame()
-        chunks = pd.read_sql(dataquery, engine, chunksize=1)
-        # count = pd.read_sql(countquery, engine).values[0][0]
-        # f = io.StringIO()
-        # with redirect_stderr(f):
-        # for chunk in tqdm(chunks, total=count):
-        for chunk in chunks:
-            input_df = pd.concat(
-                [input_df, chunk])  # prog = f.getvalue().split('\r ')[-1].strip()  # print(prog)  # time.sleep(0.2)
+        input_df = pd.read_sql(dataquery, engine)
         input_df['Client'] = clientname
+
     # Case 2: Non-SPR Client, Rolled Up
     elif filename is not None:
-        input_df = pd.DataFrame()
-        chunks = pd.read_csv(filename, encoding='ISO-8859-1', low_memory=False, chunksize=1, na_values='')
-        # f = io.StringIO()
-        # with redirect_stderr(f):
-        for chunk in chunks:
-            input_df = pd.concat(
-                [input_df, chunk])  # prog = f.getvalue().split('\r ')[-1].strip()  # print(prog)  # time.sleep(0.2)
+        input_df = pd.read_csv(filename, encoding='ISO-8859-1', low_memory=False)
         expected_columns = ['Supplier', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year']
         inlist = [col in input_df.columns for col in expected_columns]
         if sum(inlist) != len(expected_columns):
@@ -160,15 +142,10 @@ def main():
             logging.info(f'The following columns were expected but not found: {missinglist}..')
             raise SystemExit()
         input_df['Client'] = clientname
+
     # Case 3: Non-SPR Client, Raw
     elif filename2 is not None:
-        temp_df = pd.DataFrame()
-        chunks = pd.read_csv(filename2, encoding='ISO-8859-1', low_memory=False, chunksize=1)
-        # f = io.StringIO()
-        # with redirect_stderr(f):
-        for chunk in chunks:
-            temp_df = pd.concat(
-                [temp_df, chunk])  # prog = f.getvalue().split('\r ')[-1].strip()  # print(prog)  # time.sleep(0.2)
+        temp_df = pd.read_csv(filename2, encoding='ISO-8859-1', low_memory=False)
         expected_columns = ['Vendor Name', 'Invoice Date', 'Gross Invoice Amount']
         inlist = [col in temp_df.columns for col in expected_columns]
         if sum(inlist) != len(expected_columns):
@@ -182,6 +159,7 @@ def main():
         input_df = pd.merge(sums, counts, on=['Supplier', 'Year']).rename(
             columns={'Gross Invoice Amount': 'Total_Invoice_Amount', 'Invoice Date': 'Total_Invoice_Count', })
         input_df['Client'] = clientname
+
     # Null case
     else:
         logging.info('Sorry, something went wrong loading the new client data...')
@@ -190,8 +168,8 @@ def main():
     # Data processing
     logging.info('\nPreparing data for analysis...')
     input_df = input_df.dropna().reset_index(drop=True)
-    input_df['Total_Invoice_Count'] = input_df.Total_Invoice_Count.fillna(0).astype(int, errors='coerce')
-    input_df['Total_Invoice_Amount'] = input_df.Total_Invoice_Count.fillna(0).astype(float, errors='coerce')
+    input_df['Total_Invoice_Count'] = input_df.Total_Invoice_Count.fillna(0).astype(int, errors='ignore')
+    input_df['Total_Invoice_Amount'] = input_df.Total_Invoice_Count.fillna(0).astype(float, errors='ignore')
     input_df['Year'] = input_df.Year.fillna(0).astype(int).astype(str)
     input_df['Avg_Invoice_Size'] = input_df['Total_Invoice_Amount'] / input_df['Total_Invoice_Count']
 
@@ -222,12 +200,15 @@ def main():
     # Find candidate matches with score above threshold
     candidates = {}
     for i, s in enumerate(unmatched_series):
-        # prog = round(100 * ((i + 1) / count_unmatched), 2)
+        prog = round(100 * ((i + 1) / count_unmatched), 1)
         d = {r: fuzz.ratio(s, r) for r in reference_series}
         if max(d.values()) > threshold:
             k = helpers.keys_with_top_values(d)
             # print(f'{s} = {k[0][0]}...?')
-            candidates[s] = k  # print(f'{i + 1}/{count_unmatched} ({prog}%)', end='\r', flush=True)
+            candidates[s] = k
+        if i % 250 == 0:
+            out = f'{i} complete of {count_unmatched} ({prog}%)'
+            logging.info(out)
 
     count_softmatch = len(candidates)
     logging.info(f'\tFound potential soft-matches for {count_softmatch} suppliers')
