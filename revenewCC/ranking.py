@@ -203,7 +203,7 @@ def main():
 
     #  Todo: deal with cases where there is more than one softmatch--now just taking the first highest one...
     match_dict = {item[0]: item[1][0] for item in candidates.items()}
-    best_matches = pd.DataFrame(match_dict).transpose.merge(suppliers, left_index=True, right_on='Cleaned').rename(
+    best_matches = pd.DataFrame(match_dict).T.merge(suppliers, left_index=True, right_on='Cleaned').rename(
         columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) 
 
     keep_cols = ['Supplier', 'Supplier_ref', 'Commodity', 'Client', 'Year', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Avg_Invoice_Size']
@@ -213,9 +213,11 @@ def main():
         soft_matched = unmatched.merge(best_matches[['Supplier', 'Supplier_ref']], on='Supplier', how='left').drop(columns='Cleaned')
         # Add best matches back to supplier list
         xref = pd.concat([matched, soft_matched], axis=0, sort=True, ignore_index=True)
+        xref = xref.merge(comm_df, on='Supplier_ref')
         final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')
     else:
-        final_df = input_df.merge(matched, on='Supplier', how='left').drop(columns='Cleaned')
+        xref = xref.merge(comm_df, on='Supplier_ref')
+        final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')
 
     # Scorecard computations
     logging.info('\nCalculating supplier scores based on scorecard...')
