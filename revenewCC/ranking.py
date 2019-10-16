@@ -188,7 +188,8 @@ def main():
     # Data processing
     logging.info('\nPreparing data for analysis...')
     input_df = input_df.dropna().reset_index(drop=True)
-    input_df['Total_Invoice_Count'] = input_df.Total_Invoice_Count.fillna(0).astype(int)
+    input_df['Total_Invoice_Count'] = input_df.Total_Invoice_Count.fillna(0).astype(int, errors='coerce')
+    input_df['Total_Invoice_Amount'] = input_df.Total_Invoice_Count.fillna(0).astype(float, errors='coerce')
     input_df['Year'] = input_df.Year.fillna(0).astype(int).astype(str)
     input_df['Avg_Invoice_Size'] = input_df['Total_Invoice_Amount'] / input_df['Total_Invoice_Count']
 
@@ -205,7 +206,7 @@ def main():
     combined = pd.merge(suppliers, xref_list, on='Supplier', how='outer', indicator=True)
     unmatched = combined[combined['_merge'] == 'left_only'].drop(columns=['_merge', 'Supplier_ref'])
     matched = combined[combined['_merge'] == 'both'].drop(columns=['_merge', 'Cleaned'])
-    count_total, count_matched, count_unmatched = len(suppliers), len(matched), len(unmatched)
+    count_total, count_matched, count_unmatched = len(combined), len(matched), len(unmatched)
 
     # Print info about the matching
     logging.info(f'\tTotal suppliers: {count_total}')
@@ -219,7 +220,7 @@ def main():
     # Find candidate matches with score above threshold
     candidates = {}
     for i, s in enumerate(unmatched_series):
-        prog = round(100 * ((i + 1) / count_unmatched), 2)
+        # prog = round(100 * ((i + 1) / count_unmatched), 2)
         d = {r: fuzz.ratio(s, r) for r in reference_series}
         if max(d.values()) > threshold:
             k = helpers.keys_with_top_values(d)
