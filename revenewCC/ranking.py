@@ -57,7 +57,7 @@ def main():
             user = 'sa'
             password = 'Aviana$92821'
             database = 'AvianaML'
-            driver = '{SQL Server}'
+            driver = "C:/Windows/System32/sqlsrv32.dll"
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
     else:
         cnxn_str = f'mssql+pyodbc://@{dsn}'
