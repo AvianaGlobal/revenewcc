@@ -36,23 +36,27 @@ def main():
     #
     # from revenewCC.defaults import database, clientname, filename, filename2, outputdir
     #
-
-    # Set up data connection
     import os  # Backdoor for developer
-    if os.environ['USER'] == 'mj':
-        import sys
-        host = '208.43.250.18'
-        port = '51949'
-        user = 'sa'
-        password = 'Aviana$92821'
-        database = 'RevenewTest'
-        if sys.platform == 'darwin':
+    import sys
+    if sys.platform == 'darwin':
+        if os.environ['USER'] == 'mj':
+            host = '208.43.250.18'
+            port = '51949'
+            user = 'sa'
+            password = 'Aviana$92821'
+            database = 'AvianaML'
             driver = '/usr/local/lib/libmsodbcsql.13.dylib'
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-        else:
-            driver = '{SQL Server}'
+    elif sys.platform == 'win32':
+        if os.environ['USERNAME'] == 'mj':
+            host = '208.43.250.18'
+            port = '51949'
+            user = 'sa'
+            password = 'Aviana$92821'
+            database = 'AvianaML'
+            driver = "C:/Windows/System32/sqlsrv32.dll"
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-        database = None  # cnxn_str = f'mssql+pyodbc://@{dsn}'
+    database = args.database  # cnxn_str = f'mssql+pyodbc://@{dsn}' == == == = else:
 
     # Make database connection engine
     from sqlalchemy import create_engine
