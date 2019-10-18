@@ -31,14 +31,12 @@ def main():
     threshold = 89
 
     # Make database connection engine
+    cnxn_str = f'mssql+pyodbc://@{dsn}'
     if sys.platform == 'darwin':
         if os.environ['USER'] == 'mj':
             user = 'sa'
             password = 'Aviana$92821'
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
-    else:
-        cnxn_str = f'mssql+pyodbc://@{dsn}'
-
     engine = create_engine(cnxn_str, fast_executemany=True)
     engine.connect()
 
