@@ -30,24 +30,8 @@ def main():
     # Set default threshold for soft-matching
     threshold = 89
 
-    # TODO: delete me!
-    # Default database connection via ODBC
-    host = '208.43.250.18'
-    port = '51949'
-    user = 'sa'
-    password = 'Aviana$92821'
-
-    # dsn = 'cc'
-    # database = 'RevenewTest'
-
-    # Backdoor connection for developer
-    if sys.platform == 'darwin' and os.environ['USER'] == 'mj':
-        driver = '/usr/local/lib/libmsodbcsql.13.dylib'
-        cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
-    else:
-        cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
-
     # Make database connection engine
+    cnxn_str = f'mssql+pyodbc://@{dsn}'
     engine = create_engine(cnxn_str, fast_executemany=True)
     engine.connect()
 
@@ -65,9 +49,15 @@ def main():
     logging.info('\nSetting up workspace...')
 
     # Read in all Resource Files TODO update crossref
-    xref_list = pd.read_pickle('revenewCC/inputdata/crossref.pkl')
-    comm_list = pd.read_pickle('revenewCC/inputdata/commodities.pkl')
-    scorecard = pd.read_pickle('revenewCC/inputdata/scorecard.pkl')
+    xref_list = pd.DataFrame()
+    xrefquery = "SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref"
+    supplier_crossref_list = pd.read_sql(xrefquery, engine)
+
+    comm_list = pd.DataFrame()
+    commquery = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
+    commodity_list = pd.read_sql(commquery, engine)
+
+    scorecard = pd.read_sql('SELECT * FROM Revenew.dbo.scorecard', engine)
 
     # Merge crossref and commodities
     comm_df = pd.merge(xref_list, comm_list, on=['Supplier'], how='left').groupby(
