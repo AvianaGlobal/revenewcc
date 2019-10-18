@@ -31,7 +31,14 @@ def main():
     threshold = 89
 
     # Make database connection engine
-    cnxn_str = f'mssql+pyodbc://@{dsn}'
+    if sys.platform == 'darwin':
+        if os.environ['USER'] == 'mj':
+            user = 'sa'
+            password = 'Aviana$92821'
+            cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
+    else:
+        cnxn_str = f'mssql+pyodbc://@{dsn}'
+
     engine = create_engine(cnxn_str, fast_executemany=True)
     engine.connect()
 
@@ -192,7 +199,7 @@ def main():
     #  Todo: deal with cases where there is more than one softmatch--now just taking the first highest one...
     match_dict = {item[0]: item[1][0] for item in candidates.items()}
     best_matches = pd.DataFrame(match_dict).T.merge(suppliers, left_index=True, right_on='Cleaned').rename(
-        columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) 
+        columns={0: 'Supplier_ref', 1: 'Softmatch_Score'})
 
     keep_cols = ['Supplier', 'Supplier_ref', 'Commodity', 'Client', 'Year', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Avg_Invoice_Size']
 
