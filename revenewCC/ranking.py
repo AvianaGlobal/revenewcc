@@ -48,14 +48,12 @@ def main():
     logging.info(f'\nCurrent working directory: {os.getcwd()}')
     logging.info('\nSetting up workspace...')
 
-    # Read in all Resource Files TODO update crossref
-    xref_list = pd.DataFrame()
+    # Read in all Resource Files
     xrefquery = "SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref"
-    supplier_crossref_list = pd.read_sql(xrefquery, engine)
+    xref_list = pd.read_sql(xrefquery, engine)
 
-    comm_list = pd.DataFrame()
     commquery = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
-    commodity_list = pd.read_sql(commquery, engine)
+    comm_list = pd.read_sql(commquery, engine)
 
     scorecard = pd.read_sql('SELECT * FROM Revenew.dbo.scorecard', engine)
 
@@ -164,7 +162,7 @@ def main():
     combined = pd.merge(suppliers, xref_list, on='Supplier', how='outer', indicator=True)
     unmatched = combined[combined['_merge'] == 'left_only'].drop(columns=['_merge', 'Supplier_ref'])
     matched = combined[combined['_merge'] == 'both'].drop(columns=['_merge', 'Cleaned'])
-    count_total, count_matched, count_unmatched =  len(matched).add(len(unmatched)), len(matched), len(unmatched)
+    count_total, count_matched, count_unmatched =  len(matched) + len(unmatched), len(matched), len(unmatched)
 
     # Print info about the matching
     logging.info(f'\tTotal suppliers: {count_total}')
