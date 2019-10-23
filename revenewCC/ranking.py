@@ -67,12 +67,11 @@ def main():
         ['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')[['Supplier_ref', 'Commodity']]
 
     # clean up
-    comm_df["Commodity"] = comm_df["Commodity"].fillna("NOT_AVAILABLE")
-    comm_df["Commodity"].replace(to_replace=["FACILITIES MAINTENANCE/SECURITY", "REMOVE", "STAFF AUGMENTATION",
-                                             "INSPECTION/MONITORING/LAB SERVICES", "TELECOMMUNICATIONS",
-                                             "METER READING SERVICES", "CHEMICALS/ADDITIVES/INDUSTRIAL GAS", ],
-                                 value="SMALL_COUNT_COMM_GROUPS", inplace=True)
-
+    comm_df['Commodity'] = comm_df['Commodity'].fillna('NOT_AVAILABLE')
+    comm_df['Commodity'].replace(to_replace=['FACILITIES MAINTENANCE/SECURITY', 'REMOVE', 'STAFF AUGMENTATION',
+                                             'INSPECTION/MONITORING/LAB SERVICES', 'TELECOMMUNICATIONS',
+                                             'METER READING SERVICES', 'CHEMICALS/ADDITIVES/INDUSTRIAL GAS', ],
+                                 value='SMALL_COUNT_COMM_GROUPS', inplace=True)
 
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
@@ -150,7 +149,7 @@ def main():
     logging.info('\nPreparing data for analysis...')
     input_df = input_df.dropna().reset_index(drop=True)
     input_df['Total_Invoice_Count'] = input_df.Total_Invoice_Count.fillna(0).astype(int, errors='ignore')
-    input_df['Total_Invoice_Amount'] = input_df.Total_Invoice_Count.fillna(0).astype(float, errors='ignore')
+    input_df['Total_Invoice_Amount'] = input_df.Total_Invoice_Amount.fillna(0).astype(float, errors='ignore')
     input_df['Year'] = input_df.Year.fillna(0).astype(int).astype(str)
     input_df['Avg_Invoice_Size'] = input_df['Total_Invoice_Amount'].div(input_df['Total_Invoice_Count'])
 
@@ -160,57 +159,75 @@ def main():
     # Create unique list of suppliers
     logging.info('\nCreating unique list of suppliers...')
     suppliers = input_df[['Supplier', 'Cleaned']].dropna().drop_duplicates()
+    # suppliers.head(5)
+    # xref_list.head(5)
 
     # Merge input data with crossref
     logging.info('\nMatching supplier names against cross-reference file...')
-
     combined = pd.merge(suppliers, xref_list, on='Supplier', how='outer', indicator=True)
     unmatched = combined[combined['_merge'] == 'left_only'].drop(columns=['_merge', 'Supplier_ref'])
     matched = combined[combined['_merge'] == 'both'].drop(columns=['_merge', 'Cleaned'])
-    count_total, count_matched, count_unmatched =  len(matched) + len(unmatched), len(matched), len(unmatched)
+    count_total, count_matched, count_unmatched = len(matched) + len(unmatched), len(matched), len(unmatched)
+    # combined.head(5)
+    # unmatched.head(5)
+    # matched.head(5)
 
     # Print info about the matching
     logging.info(f'\tTotal suppliers: {count_total}')
     logging.info(f'\tMatched suppliers: {count_matched}')
     logging.info(f'\tUnmatched suppliers: {count_unmatched}')
     logging.info(f'\nTrying to soft-match the unmatched suppliers...')
-
     unmatched_series = unmatched['Cleaned']
     reference_series = comm_df['Supplier_ref']
 
-    # Find candidate matches with score above threshold
+    # Create master dict mapping unmatched suppliers to lists of softmatch candidates and their scores
     candidates = {}
+    # Find candidate matches with score above threshold for each unmatched supplier
     for i, s in enumerate(unmatched_series):
-        prog = round(100 * ((i + 1) / count_unmatched), 1)
+        # Create a temp dict with {supplier_ref: fuzz_ ratio} key-value pairs
         d = {r: fuzz.ratio(s, r) for r in reference_series}
+        # Keep if fuzz ratio above threshold
+        if max(d.values()) > threshold:
+            # Get the highest scoring supplier
+            k = helpers.keys_with_top_values(d)
+            # Update master dict with softmatch
+            candidates[s] = k
+        # Output progress through list of unmatched suppliers
+        prog = round(100 * ((i + 1) / count_unmatched), 1)
+        # Only print every 250 itterations
         if i % 250 == 0:
             out = f'{i} complete of {count_unmatched} ({prog}%)'
             logging.info(out)
-        if max(d.values()) > threshold:
-            k = helpers.keys_with_top_values(d)
-            # print(f'{s} = {k[0][0]}...?')
-            candidates[s] = k
 
     count_softmatch = len(candidates)
     logging.info(f'\tFound potential soft-matches for {count_softmatch} suppliers')
 
-    #  Todo: deal with cases where there is more than one softmatch--now just taking the first highest one...
+    #  Todo: deal with cases where there is more than one softmatch--now just taking the first one...
     match_dict = {item[0]: item[1][0] for item in candidates.items()}
-    best_matches = pd.DataFrame(match_dict).T.merge(suppliers, left_index=True, right_on='Cleaned').rename(
-        columns={0: 'Supplier_ref', 1: 'Softmatch_Score'})
+    best_matches = pd.DataFrame(match_dict).T \
+        .merge(suppliers, left_index=True, right_on='Cleaned') \
+        .rename(columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) \
+        .merge(input_df[['Cleaned', 'Total_Invoice_Amount']], on='Cleaned') \
+        .groupby(['Supplier', 'Cleaned', 'Supplier_ref', ]) \
+        .agg({'Softmatch_Score': 'min', 'Total_Invoice_Amount': 'sum'}) \
+        .sort_values('Total_Invoice_Amount', ascending=False) \
+        .reset_index()
+    # best_matches.head(5)
 
-    keep_cols = ['Supplier', 'Supplier_ref', 'Commodity', 'Client', 'Year', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Avg_Invoice_Size']
-
+    # Combine softmatches with unmatched suppliers
     if len(best_matches) > 0:
-        # Combine softmatches with unmatched suppliers
-        soft_matched = unmatched.merge(best_matches[['Supplier', 'Supplier_ref']], on='Supplier', how='left').drop(columns='Cleaned')
+        soft_matched = best_matches[['Supplier', 'Supplier_ref']]
         # Add best matches back to supplier list
         xref = pd.concat([matched, soft_matched], axis=0, sort=True, ignore_index=True)
         xref = xref.merge(comm_df, on='Supplier_ref')
         final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')
     else:
-        xref = xref.merge(comm_df, on='Supplier_ref')
+        xref = matched.merge(comm_df, on='Supplier_ref')
         final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')
+
+    # Update commodities that are missing because they were unmatched
+    final_df['Commodity'].fillna('NOT_AVAILABLE', inplace=True)
+    final_df = final_df.loc[final_df.Total_Invoice_Count > 0, :]
 
     # Scorecard computations
     logging.info('\nCalculating supplier scores based on scorecard...')
@@ -224,36 +241,39 @@ def main():
     sc_df_spend = sc_df.loc[sc_df['Factor'] == 'Spend'].reset_index()
     sc_df_spend = (sc_df_spend.loc[sc_df_spend['Total_Invoice_Amount'] < sc_df_spend['Max']])
     sc_df_spend = (sc_df_spend.loc[sc_df_spend['Total_Invoice_Amount'] > sc_df_spend['Min']])
-    sc_df_spend = sc_df_spend.reset_index()
+    sc_df_spend = sc_df_spend.reset_index().drop(columns=['Min', 'Max'])
 
     # STEP 8c-2: #get the InvoiceSize sub-dataframe
     sc_df_invoicesize = sc_df.loc[sc_df['Factor'] == 'InvoiceSize'].reset_index()
     sc_df_invoicesize = (sc_df_invoicesize.loc[sc_df_invoicesize['Avg_Invoice_Size'] < sc_df_invoicesize['Max']])
     sc_df_invoicesize = (sc_df_invoicesize.loc[sc_df_invoicesize['Avg_Invoice_Size'] > sc_df_invoicesize['Min']])
-    sc_df_invoicesize = sc_df_invoicesize.reset_index()
+    sc_df_invoicesize = sc_df_invoicesize.reset_index().drop(columns=['Min', 'Max'])
 
     # STEP 8c-3: #get the InvoiceCount sub-dataframe
     sc_df_invoicecount = sc_df.loc[sc_df['Factor'] == 'InvoiceCount'].reset_index()
     sc_df_invoicecount = sc_df_invoicecount.loc[sc_df_invoicecount['Total_Invoice_Count'] < sc_df_invoicecount['Max']]
     sc_df_invoicecount = sc_df_invoicecount.loc[sc_df_invoicecount['Total_Invoice_Count'] > sc_df_invoicecount['Min']]
-    sc_df_invoicecount = sc_df_invoicecount.reset_index()
+    sc_df_invoicecount = sc_df_invoicecount.reset_index().drop(columns=['Min', 'Max'])
 
     # STEP 8c-4: get the Commodity sub-dataframe
     sc_df_commodity = sc_df.loc[sc_df['Factor'] == 'Commodity'].reset_index()
     sc_df_commodity = (sc_df_commodity.loc[sc_df_commodity['Commodity'] == sc_df_commodity['Tier']])
-    sc_df_commodity = sc_df_commodity.reset_index()
+    sc_df_commodity = sc_df_commodity.reset_index().drop(columns=['Min', 'Max'])
+
 
     # STEP 8d: # append all the factor scores
     scores = pd.concat([sc_df_spend, sc_df_invoicesize, sc_df_invoicecount, sc_df_commodity], axis=0, sort=False).drop(
-        columns=['level_0', 'index'])
+        columns=['level_0', 'index']).sort_values(['Supplier', 'Factor', 'Year'])
+
+    scores.Supplier_ref.fillna(helpers.clean_up_string(scores.Supplier), inplace=True)
+    scores['Supplier_ref'] = scores.Supplier_ref.str.upper()
 
     # score at supplier-year-factor-tier level  Fixme: remove min/max cols
-    factor_scores = scores.groupby(['Supplier_ref', 'Year', 'Factor']).sum().stack().unstack().drop(
-        columns=['Min', 'Max'])
+    factor_scores = scores.groupby(['Supplier_ref', 'Year', 'Factor']).sum().stack().unstack()
 
     # score at supplier-year level
-    year_scores = scores.groupby(['Supplier_ref', 'Year']).sum().stack().unstack().unstack(level=1).drop(
-        columns=['Min', 'Max'])
+    year_scores = scores.groupby(['Supplier_ref', 'Year']).sum().stack().unstack().unstack(level=1)
+
     logging.info(f'\nWriting output file to {outputdir}...')
 
     # Create a Pandas Excel writer using XlsxWriter as the engine.

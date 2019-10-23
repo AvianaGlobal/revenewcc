@@ -1,12 +1,17 @@
-dsn = "rev"
-database = None
-clientname = 'Chemours'
-driver = "/usr/local/lib/libmsodbcsql.13.dylib"
-filename = "/Users/mj/Downloads/Chemoursrolledup.csv"
-# filename2 = "revenewCC/inputdata/TestNonSPR_Raw.csv"
-outputdir = "/Users/mj/Desktop/"
-host = '208.43.250.18'
-port = '51949'
+dsn = "revcc"
 user = 'sa'
 password = 'Aviana$92821'
+cnxn_dsn = f'mssql+pyodbc://{user}:{password}@{dsn}'
+database = None
+clientname = 'Casey'
+
+driver = "/usr/local/lib/libmsodbcsql.13.dylib"
+host = '208.43.250.18'
+port = '51949'
 cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
+
+# filename = "/Users/mj/Downloads/Chemoursrolledup.csv"
+filename = '/Users/mj/Desktop/CaseyRolledUpFinal.csv'
+# filename2 = "revenewCC/inputdata/TestNonSPR_Raw.csv"
+outputdir = "/Users/mj/Desktop/"
+
