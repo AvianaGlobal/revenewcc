@@ -240,6 +240,7 @@ def main():
     final_df = final_df.loc[final_df.Total_Invoice_Count > 0, :]
 
     # Output invoice amounts for unmatched suppliers
+    # # Note: these are grouped by Supplier
     unmatched_df = final_df.loc[final_df.Supplier_ref == '', :] \
         .groupby('Supplier') \
         .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum'}) \
@@ -247,52 +248,54 @@ def main():
     # unmatched_df.head(5)
 
     # Output invoice amounts for matched suppliers
+    # # Note these are grouped by Supplier_ref
     matched_df = final_df.loc[final_df.Supplier_ref != '', :] \
-        .groupby('Supplier') \
-        .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum'}) \
-        .sort_values('Total_Invoice_Amount', ascending=False)
+        .groupby('Supplier_ref') \
+        .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum', 'Year': 'size'}) \
+        .rename(columns={'Year': 'Year_Count'}) \
+        .sort_values('Total_Invoice_Amount', ascending=False) \
+        .reset_index()
     matched_df['Supplier_ref'] = matched_df['Supplier_ref'].str.upper()
     # matched_df.head(5)
 
-    # Scorecard computations  # TODO Refactor code
+    # Scorecard computations  # TODO Refactoring
     logging.info('\nCalculating supplier scores based on scorecard...')
 
     # STEP 8b: do a full outer join with the scorecard
     final_df['key'] = 1
     scorecard['key'] = 1
-    sc_df = pd.merge(final_df, scorecard, on='key').drop(columns='key')
+    scorecard_df = pd.merge(final_df, scorecard, on='key').drop(columns='key')
 
     # STEP 8c-1: get the Spend sub-dataframe
-    sc_df_spend = sc_df.loc[sc_df['Factor'] == 'Spend'].reset_index()
-    sc_df_spend = (sc_df_spend.loc[sc_df_spend['Total_Invoice_Amount'] < sc_df_spend['Max']])
-    sc_df_spend = (sc_df_spend.loc[sc_df_spend['Total_Invoice_Amount'] > sc_df_spend['Min']])
-    sc_df_spend = sc_df_spend.reset_index().drop(columns=['Min', 'Max'])
+    spend = scorecard_df.loc[scorecard_df['Factor'] == 'Spend']
+    spend = (spend.loc[spend['Total_Invoice_Amount'] < spend['Max']])
+    spend = (spend.loc[spend['Total_Invoice_Amount'] > spend['Min']])
+    spend = spend.drop(columns=['Min', 'Max'])
 
     # STEP 8c-2: #get the InvoiceSize sub-dataframe
-    sc_df_invoicesize = sc_df.loc[sc_df['Factor'] == 'InvoiceSize'].reset_index()
-    sc_df_invoicesize = (sc_df_invoicesize.loc[sc_df_invoicesize['Avg_Invoice_Size'] < sc_df_invoicesize['Max']])
-    sc_df_invoicesize = (sc_df_invoicesize.loc[sc_df_invoicesize['Avg_Invoice_Size'] > sc_df_invoicesize['Min']])
-    sc_df_invoicesize = sc_df_invoicesize.reset_index().drop(columns=['Min', 'Max'])
+    size = scorecard_df.loc[scorecard_df['Factor'] == 'InvoiceSize']
+    size = (size.loc[size['Avg_Invoice_Size'] < size['Max']])
+    size = (size.loc[size['Avg_Invoice_Size'] > size['Min']])
+    size = size.drop(columns=['Min', 'Max'])
 
     # STEP 8c-3: #get the InvoiceCount sub-dataframe
-    sc_df_invoicecount = sc_df.loc[sc_df['Factor'] == 'InvoiceCount'].reset_index()
-    sc_df_invoicecount = sc_df_invoicecount.loc[sc_df_invoicecount['Total_Invoice_Count'] < sc_df_invoicecount['Max']]
-    sc_df_invoicecount = sc_df_invoicecount.loc[sc_df_invoicecount['Total_Invoice_Count'] > sc_df_invoicecount['Min']]
-    sc_df_invoicecount = sc_df_invoicecount.reset_index().drop(columns=['Min', 'Max'])
+    count = scorecard_df.loc[scorecard_df['Factor'] == 'InvoiceCount']
+    count = count.loc[count['Total_Invoice_Count'] < count['Max']]
+    count = count.loc[count['Total_Invoice_Count'] > count['Min']]
+    count = count.drop(columns=['Min', 'Max'])
 
     # STEP 8c-4: get the Commodity sub-dataframe
-    sc_df_commodity = sc_df.loc[sc_df['Factor'] == 'Commodity'].reset_index()
-    sc_df_commodity = (sc_df_commodity.loc[sc_df_commodity['Commodity'] == sc_df_commodity['Tier']])
-    sc_df_commodity = sc_df_commodity.reset_index().drop(columns=['Min', 'Max'])
+    commodity = scorecard_df.loc[scorecard_df['Factor'] == 'Commodity']
+    commodity = commodity.loc[commodity['Commodity'] == commodity['Tier']]
+    commodity = commodity.reset_index().drop(columns=['Min', 'Max'])
 
     # STEP 8d: # append all the factor scores
-    scores = pd.concat(
-        [sc_df_spend, sc_df_invoicesize, sc_df_invoicecount, sc_df_commodity],
-        axis=0, sort=False, ignore_index=True) \
-        .drop(columns=['level_0', 'index']).sort_values(['Supplier', 'Factor', 'Year'])
+    scores = pd.concat([spend, size, count, commodity], axis=0, sort=False, ignore_index=True) \
+        .drop(columns=['level_0', 'index']) \
+        .sort_values(['Supplier', 'Factor', 'Year']) \
+        .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'])
 
     # We were asked to re-capitalize supplier names
-    scores['Supplier_ref'] = scores.Supplier_ref.str.upper()
 
     # Dealing with the weird way the scorecard calculations were originally done... reshaping and merging the data
     factor_scores = final_df \
@@ -302,11 +305,12 @@ def main():
         .drop(columns='key') \
         .drop_duplicates(['Client', 'Supplier', 'Supplier_ref', 'Year']) \
         .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year'], verify_integrity=True) \
-        .stack().reset_index() \
+        .stack() \
+        .reset_index() \
         .rename(columns={'level_4': 'Factor', 0: 'Value'}) \
         .drop_duplicates(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor']) \
         .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'], verify_integrity=True) \
-        .merge(scores.set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'])[['Tier', 'Points']],
+        .merge([['Tier', 'Points']],
                left_index=True, right_index=True) \
         .reset_index()
 
