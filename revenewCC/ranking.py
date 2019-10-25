@@ -208,6 +208,7 @@ def main():
 
     #  Todo: deal with cases where there is more than one softmatch--now just taking the first one...
     match_dict = {item[0]: item[1][0] for item in candidates.items()}
+    # Add total invoice amount for softmatches
     best_matches = pd.DataFrame(match_dict).T \
         .merge(suppliers, left_index=True, right_on='Cleaned') \
         .rename(columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) \
@@ -237,8 +238,19 @@ def main():
 
     # Only include supplier-years with invoices
     final_df = final_df.loc[final_df.Total_Invoice_Count > 0, :]
+    unmatched_df = final_df.loc[final_df.Supplier_ref == '', :] \
+        .groupby('Supplier') \
+        .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum'}) \
+        .sort_values('Total_Invoice_Amount', ascending=False)
+    # unmatched_df.head(5)
 
-    # Scorecard computations
+    matched_df = final_df.loc[final_df.Supplier_ref != '', :] \
+        .groupby('Supplier') \
+        .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum'}) \
+        .sort_values('Total_Invoice_Amount', ascending=False)
+    # matched_df.head(5)
+
+    # Scorecard computations  # TODO Refactor code
     logging.info('\nCalculating supplier scores based on scorecard...')
 
     # STEP 8b: do a full outer join with the scorecard
@@ -279,36 +291,37 @@ def main():
     scores['Supplier_ref'] = scores.Supplier_ref.str.upper()
 
     # Dealing with the weird way the scorecard calculations were originally done... reshaping and merging the data
-    score_df = scores[['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor', 'Tier', 'Points']] \
-        .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'])
-    temp_df = final_df.rename(columns=
-                              {'Total_Invoice_Amount': 'Spend', 'Total_Invoice_Count': 'InvoiceCount',
-                               'Avg_Invoice_Size': 'InvoiceSize'}) \
+    score_df = final_df \
+        .rename(columns={
+        'Total_Invoice_Amount': 'Spend',
+        'Total_Invoice_Count': 'InvoiceCount',
+        'Avg_Invoice_Size': 'InvoiceSize'}) \
         .drop(columns='key') \
-        .replace('NOT_AVAILABLE', '') \
+        .drop_duplicates(['Client', 'Supplier', 'Supplier_ref', 'Year']) \
         .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year'], verify_integrity=True) \
-        .stack() \
-        .reset_index() \
+        .stack().reset_index() \
         .rename(columns={'level_4': 'Factor', 0: 'Value'}) \
-        .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'], verify_integrity=True)
-    out_df = temp_df.merge(score_df, left_index=True, right_index=True)
-    out_df
+        .drop_duplicates(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor']) \
+        .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'], verify_integrity=True) \
+        .merge(scores.set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'])[['Tier', 'Points']],
+               left_index=True, right_index=True)
 
-    # score at supplier-year-factor-tier level  Fixme: remove min/max cols
-    factor_scores = scores.groupby(['Supplier_ref', 'Year', 'Factor']).sum().stack().unstack()
+    # score at supplier-year-factor-tier level
+    scores['Supplier'] = scores['Supplier_ref'].replace('', scores['Supplier'])
+    factor_scores = scores.groupby(['Supplier', 'Year', 'Factor']).sum().stack().unstack()
 
     # score at supplier-year level
-    year_scores = scores.groupby(['Supplier_ref', 'Year']).sum().stack().unstack().unstack(level=1)
+    year_scores = scores.groupby(['Supplier', 'Year']).sum().stack().unstack().unstack(level=1)
 
     logging.info(f'\nWriting output file to {outputdir}...')
 
     # Create a Pandas Excel writer using XlSXWriter as the engine.
     writer = pd.ExcelWriter(f'{outputdir}/{clientname}_CC_Audit_Scorecard.xlsx', engine='xlsxwriter')
     input_df.to_excel(writer, sheet_name='Raw_Data', index=False)
-    matched.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
-    unmatched.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
+    matched_df.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
+    unmatched_df.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=True)
     best_matches.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
-    out_df.to_excel(writer, sheet_name='SupplierScoreCard', index=False)
+    score_df.to_excel(writer, sheet_name='SupplierScoreCard', index=True)
     factor_scores.to_excel(writer, sheet_name='Component_Scores')
     year_scores.to_excel(writer, sheet_name='Year_Scores')
     writer.save()
