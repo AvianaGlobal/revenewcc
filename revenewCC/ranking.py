@@ -194,7 +194,7 @@ def main():
         if max(d.values()) > threshold:
             # Get the highest scoring supplier
             k = helpers.keys_with_top_values(d)
-            # Update master dict with softmatch
+            # Update master dict with soft_match
             candidates[s] = k
         # Output progress through list of unmatched suppliers
         progress = round(100 * ((i + 1) / count_unmatched), 1)
@@ -203,13 +203,13 @@ def main():
             out = f'{i} complete of {count_unmatched} ({progress}%)'
             logging.info(out)
 
-    count_softmatch = len(candidates)
-    logging.info(f'\tFound potential soft-matches for {count_softmatch} suppliers')
+    count_soft_match = len(candidates)
+    logging.info(f'\tFound potential soft-matches for {count_soft_match} suppliers')
 
-    #  Todo: deal with cases where there is more than one softmatch--now just taking the first one...
-    match_dict = {item[0]: item[1][0] for item in candidates.items()}
-    # Add total invoice amount for softmatches
-    best_matches = pd.DataFrame(match_dict).T \
+    #  Todo: deal with cases where there is more than one soft match--now just taking the first one...
+    soft_matched_dict = {item[0]: item[1][0] for item in candidates.items()}
+    # Add total invoice amount for soft_matches
+    soft_matched_df = pd.DataFrame(soft_matched_dict).T \
         .merge(suppliers, left_index=True, right_on='Cleaned') \
         .rename(columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) \
         .merge(input_df[['Cleaned', 'Total_Invoice_Amount']], on='Cleaned') \
@@ -220,8 +220,8 @@ def main():
     # best_matches.head(5)
 
     # Combine soft matches with unmatched suppliers
-    if len(best_matches) > 0:
-        soft_matched = best_matches[['Supplier', 'Supplier_ref']]
+    if len(soft_matched_df) > 0:
+        soft_matched = soft_matched_df[['Supplier', 'Supplier_ref']]
         # Add best matches back to supplier list
         xref = pd.concat([matched, soft_matched], axis=0, sort=True, ignore_index=True)
         xref = xref.merge(comm_df, on='Supplier_ref')
@@ -250,11 +250,12 @@ def main():
     # Output invoice amounts for matched suppliers
     # # Note these are grouped by Supplier_ref
     matched_df = final_df.loc[final_df.Supplier_ref != '', :] \
-        .groupby('Supplier_ref') \
+        .groupby(['Supplier_ref']) \
         .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum', 'Year': 'size'}) \
         .rename(columns={'Year': 'Year_Count'}) \
         .sort_values('Total_Invoice_Amount', ascending=False) \
-        .reset_index()
+        .reset_index() \
+        .merge(matched)
     matched_df['Supplier_ref'] = matched_df['Supplier_ref'].str.upper()
     # matched_df.head(5)
 
@@ -287,11 +288,10 @@ def main():
     # STEP 8c-4: get the Commodity sub-dataframe
     commodity = scorecard_df.loc[scorecard_df['Factor'] == 'Commodity']
     commodity = commodity.loc[commodity['Commodity'] == commodity['Tier']]
-    commodity = commodity.reset_index().drop(columns=['Min', 'Max'])
+    commodity = commodity.drop(columns=['Min', 'Max'])
 
     # STEP 8d: # append all the factor scores
     scores = pd.concat([spend, size, count, commodity], axis=0, sort=False, ignore_index=True) \
-        .drop(columns=['level_0', 'index']) \
         .sort_values(['Supplier', 'Factor', 'Year']) \
         .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'])
 
@@ -302,26 +302,27 @@ def main():
         .rename(columns={'Total_Invoice_Amount': 'Spend',
                          'Total_Invoice_Count': 'InvoiceCount',
                          'Avg_Invoice_Size': 'InvoiceSize'}) \
-        .drop(columns='key') \
-        .drop_duplicates(['Client', 'Supplier', 'Supplier_ref', 'Year']) \
+        .drop(columns=['key', 'Client']) \
+        .drop_duplicates(['Supplier', 'Supplier_ref', 'Year']) \
         .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year'], verify_integrity=True) \
         .stack() \
         .reset_index() \
         .rename(columns={'level_4': 'Factor', 0: 'Value'}) \
         .drop_duplicates(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor']) \
         .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'], verify_integrity=True) \
-        .merge([['Tier', 'Points']],
+        .merge(scores[['Tier', 'Points']],
                left_index=True, right_index=True) \
         .reset_index()
 
     # score at supplier-year-factor-tier level
-    factor_scores['Supplier_ref'].replace('', factor_scores['Supplier'], inplace=True)
+    factor_scores['Supplier_ref'] = [s.upper() for s in factor_scores.Supplier_ref]
 
-    # score at supplier-year level
+    # score at supplier-year level Fixme
     year_scores = factor_scores \
-        .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor']) \
+        .set_index(['Client', 'Supplier', 'Supplier_ref',]) \
+        .stack() \
         .unstack(level='Year')
-
+    factor_scores.stack().unstack(level='Year')
     logging.info(f'\nWriting output file to {outputdir}...')
 
     # Create a Pandas Excel writer using XlSXWriter as the engine.
@@ -329,7 +330,7 @@ def main():
     input_df.to_excel(writer, sheet_name='Raw_Data')
     matched_df.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers')
     unmatched_df.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers')
-    best_matches.to_excel(writer, sheet_name='SoftMatched_Suppliers')
+    soft_matched_df.to_excel(writer, sheet_name='SoftMatched_Suppliers')
     scorecard.to_excel(writer, sheet_name='SupplierScoreCard')
     factor_scores.to_excel(writer, sheet_name='Component_Scores')
     year_scores.to_excel(writer, sheet_name='Year_Scores')
