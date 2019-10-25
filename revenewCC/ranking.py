@@ -238,16 +238,20 @@ def main():
 
     # Only include supplier-years with invoices
     final_df = final_df.loc[final_df.Total_Invoice_Count > 0, :]
+
+    # Output invoice amounts for unmatched suppliers
     unmatched_df = final_df.loc[final_df.Supplier_ref == '', :] \
         .groupby('Supplier') \
         .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum'}) \
         .sort_values('Total_Invoice_Amount', ascending=False)
     # unmatched_df.head(5)
 
+    # Output invoice amounts for matched suppliers
     matched_df = final_df.loc[final_df.Supplier_ref != '', :] \
         .groupby('Supplier') \
         .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum'}) \
         .sort_values('Total_Invoice_Amount', ascending=False)
+    matched_df['Supplier_ref'] = matched_df['Supplier_ref'].str.upper()
     # matched_df.head(5)
 
     # Scorecard computations  # TODO Refactor code
@@ -291,11 +295,10 @@ def main():
     scores['Supplier_ref'] = scores.Supplier_ref.str.upper()
 
     # Dealing with the weird way the scorecard calculations were originally done... reshaping and merging the data
-    score_df = final_df \
-        .rename(columns={
-        'Total_Invoice_Amount': 'Spend',
-        'Total_Invoice_Count': 'InvoiceCount',
-        'Avg_Invoice_Size': 'InvoiceSize'}) \
+    factor_scores = final_df \
+        .rename(columns={'Total_Invoice_Amount': 'Spend',
+                         'Total_Invoice_Count': 'InvoiceCount',
+                         'Avg_Invoice_Size': 'InvoiceSize'}) \
         .drop(columns='key') \
         .drop_duplicates(['Client', 'Supplier', 'Supplier_ref', 'Year']) \
         .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year'], verify_integrity=True) \
@@ -304,24 +307,26 @@ def main():
         .drop_duplicates(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor']) \
         .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'], verify_integrity=True) \
         .merge(scores.set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'])[['Tier', 'Points']],
-               left_index=True, right_index=True)
+               left_index=True, right_index=True) \
+        .reset_index()
 
     # score at supplier-year-factor-tier level
-    scores['Supplier'] = scores['Supplier_ref'].replace('', scores['Supplier'])
-    factor_scores = scores.groupby(['Supplier', 'Year', 'Factor']).sum().stack().unstack()
+    factor_scores['Supplier_ref'].replace('', factor_scores['Supplier'], inplace=True)
 
     # score at supplier-year level
-    year_scores = scores.groupby(['Supplier', 'Year']).sum().stack().unstack().unstack(level=1)
+    year_scores = factor_scores \
+        .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor']) \
+        .unstack(level='Year')
 
     logging.info(f'\nWriting output file to {outputdir}...')
 
     # Create a Pandas Excel writer using XlSXWriter as the engine.
     writer = pd.ExcelWriter(f'{outputdir}/{clientname}_CC_Audit_Scorecard.xlsx', engine='xlsxwriter')
-    input_df.to_excel(writer, sheet_name='Raw_Data', index=False)
-    matched_df.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
-    unmatched_df.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=True)
-    best_matches.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
-    score_df.to_excel(writer, sheet_name='SupplierScoreCard', index=True)
+    input_df.to_excel(writer, sheet_name='Raw_Data')
+    matched_df.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers')
+    unmatched_df.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers')
+    best_matches.to_excel(writer, sheet_name='SoftMatched_Suppliers')
+    scorecard.to_excel(writer, sheet_name='SupplierScoreCard')
     factor_scores.to_excel(writer, sheet_name='Component_Scores')
     year_scores.to_excel(writer, sheet_name='Year_Scores')
     writer.save()
