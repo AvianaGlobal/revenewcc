@@ -30,20 +30,25 @@ def main():
     # Set default threshold for soft-matching
     threshold = 89
 
-    # Make database connection engine
+    # Make database connection engine (with debug settings)
     cnxn_str = f'mssql+pyodbc://@{dsn}'
     if sys.platform == 'darwin':
         if os.environ['USER'] == 'mj':
             user = 'sa'
             password = 'Aviana$92821'
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
-    engine = create_engine(cnxn_str, fast_executemany=True)
+    if sys.platform == 'win32':
+        if os.environ['USERNAME'] == 'mj':
+            user = 'sa'
+            password = 'Aviana$92821'
+            cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
+    engine = create_engine(cnxn_str, fast_executemany=True, isolation_level='AUTOCOMMIT')
     engine.connect()
 
     # Set up logging
     start = timer()
     log_file = 'log.txt'
-    logging.basicConfig(filename=log_file, level=logging.INFO)
+    logging.basicConfig(filename=log_file, level=logging.DEBUG)
     handler = logging.StreamHandler()
     logger = logging.getLogger()
     logger.addHandler(handler)
@@ -54,11 +59,11 @@ def main():
     logging.info('\nSetting up workspace...')
 
     # Read in all Resource Files
-    xrefquery = "SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref"
-    xref_list = pd.read_sql(xrefquery, engine)
+    xref_query = "SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref"
+    xref_list = pd.read_sql(xref_query, engine)
 
-    commquery = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
-    comm_list = pd.read_sql(commquery, engine)
+    comm_query = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
+    comm_list = pd.read_sql(comm_query, engine)
 
     scorecard = pd.read_sql('SELECT * FROM Revenew.dbo.scorecard', engine)
 
@@ -67,7 +72,6 @@ def main():
         ['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')[['Supplier_ref', 'Commodity']]
 
     # clean up
-    comm_df['Commodity'] = comm_df['Commodity'].fillna('NOT_AVAILABLE')
     comm_df['Commodity'].replace(to_replace=['FACILITIES MAINTENANCE/SECURITY', 'REMOVE', 'STAFF AUGMENTATION',
                                              'INSPECTION/MONITORING/LAB SERVICES', 'TELECOMMUNICATIONS',
                                              'METER READING SERVICES', 'CHEMICALS/ADDITIVES/INDUSTRIAL GAS', ],
@@ -150,7 +154,7 @@ def main():
     input_df = input_df.dropna().reset_index(drop=True)
     input_df['Total_Invoice_Count'] = input_df.Total_Invoice_Count.fillna(0).astype(int, errors='ignore')
     input_df['Total_Invoice_Amount'] = input_df.Total_Invoice_Amount.fillna(0).astype(float, errors='ignore')
-    input_df['Year'] = input_df.Year.fillna(0).astype(int).astype(str)
+    input_df['Year'] = input_df.Year.fillna(0).astype(int).astype(str)  # filtered out zeros above so next part is ok
     input_df['Avg_Invoice_Size'] = input_df['Total_Invoice_Amount'].div(input_df['Total_Invoice_Count'])
 
     # Clean up the supplier name string
@@ -180,7 +184,7 @@ def main():
     unmatched_series = unmatched['Cleaned']
     reference_series = comm_df['Supplier_ref']
 
-    # Create master dict mapping unmatched suppliers to lists of softmatch candidates and their scores
+    # Create master dict mapping unmatched suppliers to lists of candidates and their scores
     candidates = {}
     # Find candidate matches with score above threshold for each unmatched supplier
     for i, s in enumerate(unmatched_series):
@@ -193,10 +197,10 @@ def main():
             # Update master dict with softmatch
             candidates[s] = k
         # Output progress through list of unmatched suppliers
-        prog = round(100 * ((i + 1) / count_unmatched), 1)
-        # Only print every 250 itterations
+        progress = round(100 * ((i + 1) / count_unmatched), 1)
+        # Only print every 250 iterations
         if i % 250 == 0:
-            out = f'{i} complete of {count_unmatched} ({prog}%)'
+            out = f'{i} complete of {count_unmatched} ({progress}%)'
             logging.info(out)
 
     count_softmatch = len(candidates)
@@ -214,7 +218,7 @@ def main():
         .reset_index()
     # best_matches.head(5)
 
-    # Combine softmatches with unmatched suppliers
+    # Combine soft matches with unmatched suppliers
     if len(best_matches) > 0:
         soft_matched = best_matches[['Supplier', 'Supplier_ref']]
         # Add best matches back to supplier list
@@ -260,12 +264,13 @@ def main():
     sc_df_commodity = (sc_df_commodity.loc[sc_df_commodity['Commodity'] == sc_df_commodity['Tier']])
     sc_df_commodity = sc_df_commodity.reset_index().drop(columns=['Min', 'Max'])
 
-
     # STEP 8d: # append all the factor scores
-    scores = pd.concat([sc_df_spend, sc_df_invoicesize, sc_df_invoicecount, sc_df_commodity], axis=0, sort=False).drop(
-        columns=['level_0', 'index']).sort_values(['Supplier', 'Factor', 'Year'])
+    scores = pd.concat(
+        [sc_df_spend, sc_df_invoicesize, sc_df_invoicecount, sc_df_commodity],
+        axis=0, sort=False, ignore_index=True) \
+        .drop(columns=['level_0', 'index']).sort_values(['Supplier', 'Factor', 'Year'])
 
-    scores.Supplier_ref.fillna(helpers.clean_up_string(scores.Supplier), inplace=True)
+    # We were asked to re-capitalize supplier names
     scores['Supplier_ref'] = scores.Supplier_ref.str.upper()
 
     # score at supplier-year-factor-tier level  Fixme: remove min/max cols
@@ -276,7 +281,7 @@ def main():
 
     logging.info(f'\nWriting output file to {outputdir}...')
 
-    # Create a Pandas Excel writer using XlsxWriter as the engine.
+    # Create a Pandas Excel writer using XlSXWriter as the engine.
     writer = pd.ExcelWriter(f'{outputdir}/{clientname}_CC_Audit_Scorecard.xlsx', engine='xlsxwriter')
     input_df.to_excel(writer, sheet_name='Raw_Data', index=False)
     matched.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)

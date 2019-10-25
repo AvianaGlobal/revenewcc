@@ -14,7 +14,7 @@ setup(
         'python-Levenshtein',
         'tqdm',
         'wxpython',
-        'xlsxwriter',
+        'xlsxwriter', 'numpy'
     ],
     entry_points={
         'console_scripts': [
