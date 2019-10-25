@@ -231,6 +231,11 @@ def main():
 
     # Update commodities that are missing because they were unmatched
     final_df['Commodity'].fillna('NOT_AVAILABLE', inplace=True)
+
+    # Fill in Supplier_ref with blanks where not available
+    final_df['Supplier_ref'].fillna('', inplace=True)
+
+    # Only include supplier-years with invoices
     final_df = final_df.loc[final_df.Total_Invoice_Count > 0, :]
 
     # Scorecard computations
@@ -273,6 +278,22 @@ def main():
     # We were asked to re-capitalize supplier names
     scores['Supplier_ref'] = scores.Supplier_ref.str.upper()
 
+    # Dealing with the weird way the scorecard calculations were originally done... reshaping and merging the data
+    score_df = scores[['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor', 'Tier', 'Points']] \
+        .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'])
+    temp_df = final_df.rename(columns=
+                              {'Total_Invoice_Amount': 'Spend', 'Total_Invoice_Count': 'InvoiceCount',
+                               'Avg_Invoice_Size': 'InvoiceSize'}) \
+        .drop(columns='key') \
+        .replace('NOT_AVAILABLE', '') \
+        .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year'], verify_integrity=True) \
+        .stack() \
+        .reset_index() \
+        .rename(columns={'level_4': 'Factor', 0: 'Value'}) \
+        .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'], verify_integrity=True)
+    out_df = temp_df.merge(score_df, left_index=True, right_index=True)
+    out_df
+
     # score at supplier-year-factor-tier level  Fixme: remove min/max cols
     factor_scores = scores.groupby(['Supplier_ref', 'Year', 'Factor']).sum().stack().unstack()
 
@@ -287,7 +308,7 @@ def main():
     matched.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
     unmatched.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
     best_matches.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
-    scores.to_excel(writer, sheet_name='SupplierScoreCard', index=False)
+    out_df.to_excel(writer, sheet_name='SupplierScoreCard', index=False)
     factor_scores.to_excel(writer, sheet_name='Component_Scores')
     year_scores.to_excel(writer, sheet_name='Year_Scores')
     writer.save()
