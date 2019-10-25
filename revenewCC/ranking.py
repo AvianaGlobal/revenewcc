@@ -287,7 +287,6 @@ def main():
     matched.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
     unmatched.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
     best_matches.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
-    scores.to_excel(writer, sheet_name='SupplierScoreCard', index=False)
     factor_scores.to_excel(writer, sheet_name='Component_Scores')
     year_scores.to_excel(writer, sheet_name='Year_Scores')
     writer.save()
