@@ -108,7 +108,7 @@ def main():
     logging.info(f'\nLoading new client data...')
     # Case 1: SPR Client
     if database is not None:
-        dataquery = f"""
+        data_query = f"""
             SELECT Supplier,
                    datename(YEAR, Invoice_Date) AS Year,
                    sum(Gross_Invoice_Amount) AS Total_Invoice_Amount,
@@ -124,7 +124,7 @@ def main():
             GROUP BY Supplier, datename(YEAR, Invoice_Date)
             ORDER BY Supplier, datename(YEAR, Invoice_Date)             
 """
-        input_df = pd.read_sql(dataquery, engine)
+        input_df = pd.read_sql(data_query, engine)
         input_df['Client'] = clientname
 
     # Case 2: Non-SPR Client, Rolled Up
@@ -140,17 +140,17 @@ def main():
 
     # Case 3: Non-SPR Client, Raw
     elif filename2 is not None:
-        temp_df = pd.read_csv(filename2, encoding='ISO-8859-1', low_memory=False)
+        raw_df = pd.read_csv(filename2, encoding='ISO-8859-1', low_memory=False)
         expected_columns = ['Vendor Name', 'Invoice Date', 'Gross Invoice Amount']
-        inlist = [col in temp_df.columns for col in expected_columns]
+        inlist = [col in raw_df.columns for col in expected_columns]
         if sum(inlist) != len(expected_columns):
-            missinglist = [col for col in expected_columns if col not in temp_df.columns]
+            missinglist = [col for col in expected_columns if col not in raw_df.columns]
             logging.info(f'The following columns were expected but not found: {missinglist}..')
             raise SystemExit()
-        temp_df = temp_df[expected_columns].rename(columns={'Vendor Name': 'Supplier', })
-        temp_df['Year'] = pd.to_datetime(temp_df['Invoice Date']).dt.year
-        sums = temp_df.groupby(['Supplier', 'Year'], as_index=False)['Gross Invoice Amount'].sum()
-        counts = temp_df.groupby(['Supplier', 'Year'], as_index=False)['Invoice Date'].agg(np.size)
+        raw_df = raw_df[expected_columns].rename(columns={'Vendor Name': 'Supplier', })
+        raw_df['Year'] = pd.to_datetime(raw_df['Invoice Date']).dt.year
+        sums = raw_df.groupby(['Supplier', 'Year'], as_index=False)['Gross Invoice Amount'].sum()  # TODO refactor
+        counts = raw_df.groupby(['Supplier', 'Year'], as_index=False)['Invoice Date'].agg(np.size)
         input_df = pd.merge(sums, counts, on=['Supplier', 'Year']).rename(
             columns={'Gross Invoice Amount': 'Total_Invoice_Amount', 'Invoice Date': 'Total_Invoice_Count', })
         input_df['Client'] = clientname
