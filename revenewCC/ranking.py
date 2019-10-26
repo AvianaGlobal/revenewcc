@@ -61,18 +61,32 @@ def main():
     # Read in all Resource Files
     xref_query = "SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref"
     xref_list = pd.read_sql(xref_query, engine)
+    xref_list.to_pickle('revenewCC/inputdata/crossref.pkl')
+    xref_list = pd.read_pickle('revenewCC/inputdata/crossref.pkl')
 
-    comm_query = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
-    comm_list = pd.read_sql(comm_query, engine)
+    cmdty_query = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
+    cmdty_list = pd.read_sql(cmdty_query, engine)
+    cmdty_list.to_pickle('revenewCC/inputdata/commodity.pkl')
+    cmdty_list = pd.read_pickle('revenewCC/inputdata/commodity.pkl')
 
-    scorecard = pd.read_sql('SELECT * FROM Revenew.dbo.scorecard', engine)
+    score_cmdty_query = 'SELECT Tier, Points FROM Revenew.dbo.scorecard where Factor = "Commodity"'
+    score_size_query = 'SELECT Tier, Points FROM Revenew.dbo.scorecard where Factor = "InvoiceSize"'
+    score_count_query = 'SELECT Tier, Points FROM Revenew.dbo.scorecard where Factor = "InvoiceCount"'
+    score_spend_query = 'SELECT Tier, Points FROM Revenew.dbo.scorecard where Factor = "Spend"'
+
+    score_cmdty = pd.read_sql(score_cmdty_query, engine)
+    score_size = pd.read_sql(score_size_query, engine)
+    score_count = pd.read_sql(score_spend_query, engine)
+    score_spend = pd.read_sql(score_spend_query, engine)
+    scorecard.to_pickle('revenewCC/inputdata/scorecard.pkl')
+    scorecard.read_pickle('revenewCC/inputdata/scorecard.pkl')
 
     # Merge crossref and commodities
-    comm_df = pd.merge(xref_list, comm_list, on=['Supplier'], how='left').groupby(
+    cmdty_df = pd.merge(xref_list, cmdty_list, on=['Supplier'], how='left').groupby(
         ['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')[['Supplier_ref', 'Commodity']]
 
     # clean up
-    comm_df['Commodity'].replace(to_replace=['FACILITIES MAINTENANCE/SECURITY', 'REMOVE', 'STAFF AUGMENTATION',
+    cmdty_df['Commodity'].replace(to_replace=['FACILITIES MAINTENANCE/SECURITY', 'REMOVE', 'STAFF AUGMENTATION',
                                              'INSPECTION/MONITORING/LAB SERVICES', 'TELECOMMUNICATIONS',
                                              'METER READING SERVICES', 'CHEMICALS/ADDITIVES/INDUSTRIAL GAS', ],
                                  value='SMALL_COUNT_COMM_GROUPS', inplace=True)
@@ -182,7 +196,7 @@ def main():
     logging.info(f'\tUnmatched suppliers: {count_unmatched}')
     logging.info(f'\nTrying to soft-match the unmatched suppliers...')
     unmatched_series = unmatched['Cleaned']
-    reference_series = comm_df['Supplier_ref']
+    reference_series = cmdty_df['Supplier_ref']
 
     # Create master dict mapping unmatched suppliers to lists of candidates and their scores
     candidates = {}
@@ -224,10 +238,10 @@ def main():
         soft_matched = soft_matched_df[['Supplier', 'Supplier_ref']]
         # Add best matches back to supplier list
         xref = pd.concat([matched, soft_matched], axis=0, sort=True, ignore_index=True)
-        xref = xref.merge(comm_df, on='Supplier_ref')
+        xref = xref.merge(cmdty_df, on='Supplier_ref')
         final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')
     else:
-        xref = matched.merge(comm_df, on='Supplier_ref')
+        xref = matched.merge(cmdty_df, on='Supplier_ref')
         final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')
 
     # Update commodities that are missing because they were unmatched
