@@ -219,6 +219,7 @@ def main():
 
     #  Todo: deal with cases where there is more than one soft match--now just taking the first one...
     soft_matched_dict = {item[0]: item[1][0] for item in candidates.items()}
+
     # Add total invoice amount for soft_matches
     soft_matched_df = pd.DataFrame(soft_matched_dict).T \
         .merge(suppliers, left_index=True, right_on='Cleaned') \
@@ -270,7 +271,7 @@ def main():
     matched_df['Supplier_ref'] = matched_df['Supplier_ref'].str.upper()
     # matched_df.head(5)
 
-    # Scorecard computations  # TODO Refactoring
+    # Scorecard computations  # Fixme
     logging.info('\nCalculating supplier scores based on scorecard...')
 
     # STEP 8b: do a full outer join with the scorecard
