@@ -58,37 +58,37 @@ def main():
     logging.info(f'\nCurrent working directory: {os.getcwd()}')
     logging.info('\nSetting up workspace...')
 
-    # Read in all Resource Files
-    xref_query = "SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref"
-    cmdty_query = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
-    score_query = "SELECT Factor, Tier, Min, Max, Points FROM Revenew.dbo.scorecard"
-    score_cmdty_query = "SELECT Tier, Points FROM Revenew.dbo.scorecard WHERE Factor = 'Commodity'"
-    score_size_query = "SELECT Tier, Points, Min, Max FROM Revenew.dbo.scorecard WHERE Factor = 'InvoiceSize'"
-    score_count_query = "SELECT Tier, Points, Min, Max FROM Revenew.dbo.scorecard WHERE Factor = 'InvoiceCount'"
-    score_spend_query = "SELECT Tier, Points, Min, Max  FROM Revenew.dbo.scorecard WHERE Factor = 'Spend'"
-
-    # Load from database
-    xref_list = pd.read_sql(xref_query, engine)
-    cmdty_list = pd.read_sql(cmdty_query, engine)
-    score_list = pd.read_sql(score_query, engine)
-    score_cmdty = pd.read_sql(score_cmdty_query, engine)
-    score_size = pd.read_sql(score_size_query, engine)
-    score_count = pd.read_sql(score_count_query, engine)
-    score_spend = pd.read_sql(score_spend_query, engine)
-
-    # Save to pickle
-    xref_list.to_pickle('revenewCC/inputdata/crossref.pkl')
-    cmdty_list.to_pickle('revenewCC/inputdata/commodity.pkl')
-    score_list.to_pickle('revenewCC/inputdata/scorecard.pkl')
-    score_cmdty.to_pickle('revenewCC/inputdata/score_cmdty.pkl')
-    score_size.to_pickle('revenewCC/inputdata/score_size.pkl')
-    score_count.to_pickle('revenewCC/inputdata/score_count.pkl')
-    score_spend.to_pickle('revenewCC/inputdata/score_spend.pkl')
+    # # Read in all Resource Files
+    # xref_query = "SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref"
+    # cmdty_query = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
+    # score_query = "SELECT Factor, Tier, Points FROM Revenew.dbo.scorecard"
+    # score_cmdty_query = "SELECT Tier, Points FROM Revenew.dbo.scorecard WHERE Factor = 'Commodity'"
+    # score_size_query = "SELECT Tier, Points FROM Revenew.dbo.scorecard WHERE Factor = 'InvoiceSize'"
+    # score_count_query = "SELECT Tier, Points FROM Revenew.dbo.scorecard WHERE Factor = 'InvoiceCount'"
+    # score_spend_query = "SELECT Tier, Points  FROM Revenew.dbo.scorecard WHERE Factor = 'Spend'"
+    #
+    # # Load from database
+    # xref_list = pd.read_sql(xref_query, engine)
+    # cmdty_list = pd.read_sql(cmdty_query, engine)
+    # scorecard = pd.read_sql(score_query, engine)
+    # score_cmdty = pd.read_sql(score_cmdty_query, engine)
+    # score_size = pd.read_sql(score_size_query, engine)
+    # score_count = pd.read_sql(score_count_query, engine)
+    # score_spend = pd.read_sql(score_spend_query, engine)
+    #
+    # # Save to pickle
+    # xref_list.to_pickle('revenewCC/inputdata/crossref.pkl')
+    # cmdty_list.to_pickle('revenewCC/inputdata/commodity.pkl')
+    # scorecard.to_pickle('revenewCC/inputdata/scorecard.pkl')
+    # score_cmdty.to_pickle('revenewCC/inputdata/score_cmdty.pkl')
+    # score_size.to_pickle('revenewCC/inputdata/score_size.pkl')
+    # score_count.to_pickle('revenewCC/inputdata/score_count.pkl')
+    # score_spend.to_pickle('revenewCC/inputdata/score_spend.pkl')
 
     # Load from pickle
     xref_list = pd.read_pickle('revenewCC/inputdata/crossref.pkl')
     cmdty_list = pd.read_pickle('revenewCC/inputdata/commodity.pkl')
-    score_list = pd.read_pickle('revenewCC/inputdata/scorecard.pkl')
+    scorecard = pd.read_pickle('revenewCC/inputdata/scorecard.pkl')
     score_cmdty = pd.read_pickle('revenewCC/inputdata/score_cmdty.pkl')
     score_size = pd.read_pickle('revenewCC/inputdata/score_size.pkl')
     score_count = pd.read_pickle('revenewCC/inputdata/score_count.pkl')
@@ -123,22 +123,6 @@ def main():
                  ) t
             GROUP BY Supplier, datename(YEAR, Invoice_Date)
             ORDER BY Supplier, datename(YEAR, Invoice_Date)             
-"""
-        countquery = f"""
-            WITH df as (SELECT Supplier,
-                   datename(YEAR, Invoice_Date) AS Year,
-                   sum(Gross_Invoice_Amount) AS Total_Invoice_Amount,
-                   count(Invoice_Number) AS Total_Invoice_Count
-            FROM (
-                     SELECT DISTINCT ltrim(rtrim([Vendor Name])) AS Supplier,
-                                     [Invoice Date] AS Invoice_Date,
-                                     [Invoice Number] AS Invoice_Number,
-                                     [Gross Invoice Amount] AS Gross_Invoice_Amount
-                     FROM {database}.dbo.invoice
-                     WHERE [Vendor Name] IS NOT NULL
-                 ) t
-            GROUP BY Supplier, datename(YEAR, Invoice_Date)) 
-            SELECT COUNT(*) as Count FROM df             
 """
         input_df = pd.read_sql(dataquery, engine)
         input_df['Client'] = clientname
