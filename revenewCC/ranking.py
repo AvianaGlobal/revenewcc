@@ -107,7 +107,7 @@ def main():
         'FACILITIES MAINTENANCE/SECURITY', 'REMOVE', 'STAFF AUGMENTATION',
         'INSPECTION/MONITORING/LAB SERVICES', 'TELECOMMUNICATIONS',
         'METER READING SERVICES', 'CHEMICALS/ADDITIVES/INDUSTRIAL GAS',
-    ], value='SMALL GROUPS/OTHER', inplace=True)
+    ], value='SMALL COUNT/OTHER', inplace=True)
 
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
@@ -308,12 +308,13 @@ def main():
     # Scorecard computations  # Fixme
     logging.info('\nCalculating supplier scores based on scorecard...')
 
-    final_df['Score_Commodity'] = 0
-    final_df['Score_Avg_Invoice_Size'] = 0
-    final_df['Score_Total_Invoice_Count'] = 0
-    final_df['Score_Total_Invoice_Amount'] = 0
-
-    dict(score_cmdty.to_dict('split')['data'])
+    # final_df['Score_Commodity'] = [dict(score_cmdty.to_dict('split')['data']).get(s) for s in final_df.Commodity]
+    # final_df['Score_Avg_Invoice_Size'] = 0
+    # final_df['Tier_Avg_Invoice_Size'] = ''
+    # final_df['Score_Total_Invoice_Count'] = 0
+    # final_df['Tier_Total_Invoice_Count'] = ''
+    # final_df['Score_Total_Invoice_Amount'] = 0
+    # final_df['Tier_Total_Invoice_Amount'] = ''
 
     # STEP 8b: do a full outer join with the scorecard
     final_df['key'] = 1
@@ -321,19 +322,19 @@ def main():
     scorecard_df = pd.merge(final_df, scorecard, on='key').drop(columns='key')
 
     # STEP 8c-1: get the Spend sub-dataframe
-    spend = scorecard_df.loc[scorecard_df['Factor'] == 'Spend']
+    spend = scorecard_df.loc[scorecard_df['Factor'] == 'Total_Invoice_Amount']
     spend = (spend.loc[spend['Total_Invoice_Amount'] < spend['Max']])
     spend = (spend.loc[spend['Total_Invoice_Amount'] > spend['Min']])
     spend = spend.drop(columns=['Min', 'Max'])
 
     # STEP 8c-2: #get the InvoiceSize sub-dataframe
-    size = scorecard_df.loc[scorecard_df['Factor'] == 'InvoiceSize']
+    size = scorecard_df.loc[scorecard_df['Factor'] == 'Avg_Invoice_Size']
     size = (size.loc[size['Avg_Invoice_Size'] < size['Max']])
     size = (size.loc[size['Avg_Invoice_Size'] > size['Min']])
     size = size.drop(columns=['Min', 'Max'])
 
     # STEP 8c-3: #get the InvoiceCount sub-dataframe
-    count = scorecard_df.loc[scorecard_df['Factor'] == 'InvoiceCount']
+    count = scorecard_df.loc[scorecard_df['Factor'] == 'Total_Invoice_Count']
     count = count.loc[count['Total_Invoice_Count'] < count['Max']]
     count = count.loc[count['Total_Invoice_Count'] > count['Min']]
     count = count.drop(columns=['Min', 'Max'])
@@ -346,23 +347,20 @@ def main():
     # STEP 8d: # append all the factor scores
     scores = pd.concat([spend, size, count, commodity], axis=0, sort=False, ignore_index=True) \
         .sort_values(['Supplier', 'Factor', 'Year']) \
-        .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'])
+        .set_index(['Supplier', 'Supplier_ref', 'Year', 'Factor'])
 
     # We were asked to re-capitalize supplier names
 
     # Dealing with the weird way the scorecard calculations were originally done... reshaping and merging the data
     factor_scores = final_df \
-        .rename(columns={'Total_Invoice_Amount': 'Spend',
-                         'Total_Invoice_Count': 'InvoiceCount',
-                         'Avg_Invoice_Size': 'InvoiceSize'}) \
-        .drop(columns=['key', 'Client']) \
+        .drop(columns=['key']) \
         .drop_duplicates(['Supplier', 'Supplier_ref', 'Year']) \
-        .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year'], verify_integrity=True) \
+        .set_index(['Supplier', 'Supplier_ref', 'Year'], verify_integrity=True) \
         .stack() \
         .reset_index() \
-        .rename(columns={'level_4': 'Factor', 0: 'Value'}) \
-        .drop_duplicates(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor']) \
-        .set_index(['Client', 'Supplier', 'Supplier_ref', 'Year', 'Factor'], verify_integrity=True) \
+        .rename(columns={'level_3': 'Factor', 0: 'Value'}) \
+        .drop_duplicates(['Supplier', 'Supplier_ref', 'Year', 'Factor']) \
+        .set_index(['Supplier', 'Supplier_ref', 'Year', 'Factor'], verify_integrity=True) \
         .merge(scores[['Tier', 'Points']],
                left_index=True, right_index=True) \
         .reset_index()
@@ -372,20 +370,19 @@ def main():
 
     # score at supplier-year level Fixme
     year_scores = factor_scores \
-        .set_index(['Client', 'Supplier', 'Supplier_ref', ]) \
-        .stack() \
-        .unstack(level='Year')
-    factor_scores.stack().unstack(level='Year')
-    logging.info(f'\nWriting output file to {outputdir}...')
+        .drop_duplicates(['Supplier', 'Supplier_ref', 'Year', 'Factor']) \
+        .set_index(['Supplier', 'Supplier_ref', 'Year', 'Factor', 'Tier'], verify_integrity=True) \
+        .unstack(level=['Year', 'Factor', 'Tier'])
 
     # Create a Pandas Excel writer using XlSXWriter as the engine.
+    logging.info(f'\nWriting output file to {outputdir}...')
     writer = pd.ExcelWriter(f'{outputdir}/{clientname}_CC_Audit_Scorecard.xlsx', engine='xlsxwriter')
-    input_df.to_excel(writer, sheet_name='Raw_Data')
-    matched_df.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers')
-    unmatched_df.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers')
-    soft_matched_df.to_excel(writer, sheet_name='SoftMatched_Suppliers')
-    scorecard.to_excel(writer, sheet_name='SupplierScoreCard')
-    factor_scores.to_excel(writer, sheet_name='Component_Scores')
+    input_df.to_excel(writer, sheet_name='Raw_Data', index=False)
+    matched_df.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
+    unmatched_df.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
+    soft_matched_df.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
+    scorecard.to_excel(writer, sheet_name='SupplierScoreCard', index=False)
+    factor_scores.to_excel(writer, sheet_name='Component_Scores', index=False)
     year_scores.to_excel(writer, sheet_name='Year_Scores')
     writer.save()
 
