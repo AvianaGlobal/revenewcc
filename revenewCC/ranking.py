@@ -37,7 +37,7 @@ def main():
             user = 'sa'
             password = 'Aviana$92821'
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
-    if sys.platform == 'win32':
+    elif sys.platform == 'win32':
         if os.environ['USERNAME'] == 'mj':
             user = 'sa'
             password = 'Aviana$92821'
@@ -58,32 +58,32 @@ def main():
     logging.info(f'\nCurrent working directory: {os.getcwd()}')
     logging.info('\nSetting up workspace...')
 
-    # # Read in all Resource Files
-    # xref_query = "SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref"
-    # cmdty_query = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
-    # score_query = "SELECT Factor, Tier, Points FROM Revenew.dbo.scorecard"
-    # score_cmdty_query = "SELECT Tier, Points FROM Revenew.dbo.scorecard WHERE Factor = 'Commodity'"
-    # score_size_query = "SELECT Tier, Points FROM Revenew.dbo.scorecard WHERE Factor = 'InvoiceSize'"
-    # score_count_query = "SELECT Tier, Points FROM Revenew.dbo.scorecard WHERE Factor = 'InvoiceCount'"
-    # score_spend_query = "SELECT Tier, Points  FROM Revenew.dbo.scorecard WHERE Factor = 'Spend'"
-    #
-    # # Load from database
-    # xref_list = pd.read_sql(xref_query, engine)
-    # cmdty_list = pd.read_sql(cmdty_query, engine)
-    # scorecard = pd.read_sql(score_query, engine)
-    # score_cmdty = pd.read_sql(score_cmdty_query, engine)
-    # score_size = pd.read_sql(score_size_query, engine)
-    # score_count = pd.read_sql(score_count_query, engine)
-    # score_spend = pd.read_sql(score_spend_query, engine)
-    #
-    # # Save to pickle
-    # xref_list.to_pickle('revenewCC/inputdata/crossref.pkl')
-    # cmdty_list.to_pickle('revenewCC/inputdata/commodity.pkl')
-    # scorecard.to_pickle('revenewCC/inputdata/scorecard.pkl')
-    # score_cmdty.to_pickle('revenewCC/inputdata/score_cmdty.pkl')
-    # score_size.to_pickle('revenewCC/inputdata/score_size.pkl')
-    # score_count.to_pickle('revenewCC/inputdata/score_count.pkl')
-    # score_spend.to_pickle('revenewCC/inputdata/score_spend.pkl')
+    # Read in all Resource Files
+    xref_query = "SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref"
+    cmdty_query = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
+    score_query = "SELECT Factor, Tier, Points FROM Revenew.dbo.scorecard"
+    score_cmdty_query = "SELECT Tier, Points FROM Revenew.dbo.scorecard WHERE Factor = 'Commodity'"
+    score_size_query = "SELECT Tier, Min, Max, Points FROM Revenew.dbo.scorecard WHERE Factor = 'InvoiceSize'"
+    score_count_query = "SELECT Tier, Min, Max, Points FROM Revenew.dbo.scorecard WHERE Factor = 'InvoiceCount'"
+    score_spend_query = "SELECT Tier, Min, Max, Points  FROM Revenew.dbo.scorecard WHERE Factor = 'Spend'"
+
+    # Load from database
+    xref_list = pd.read_sql(xref_query, engine)
+    cmdty_list = pd.read_sql(cmdty_query, engine)
+    scorecard = pd.read_sql(score_query, engine)
+    score_cmdty = pd.read_sql(score_cmdty_query, engine)
+    score_size = pd.read_sql(score_size_query, engine)
+    score_count = pd.read_sql(score_count_query, engine)
+    score_spend = pd.read_sql(score_spend_query, engine)
+
+    # Save to pickle
+    xref_list.to_pickle('revenewCC/inputdata/crossref.pkl')
+    cmdty_list.to_pickle('revenewCC/inputdata/commodity.pkl')
+    scorecard.to_pickle('revenewCC/inputdata/scorecard.pkl')
+    score_cmdty.to_pickle('revenewCC/inputdata/score_cmdty.pkl')
+    score_size.to_pickle('revenewCC/inputdata/score_size.pkl')
+    score_count.to_pickle('revenewCC/inputdata/score_count.pkl')
+    score_spend.to_pickle('revenewCC/inputdata/score_spend.pkl')
 
     # Load from pickle
     xref_list = pd.read_pickle('revenewCC/inputdata/crossref.pkl')
@@ -102,7 +102,7 @@ def main():
     cmdty_df['Commodity'].replace(to_replace=['FACILITIES MAINTENANCE/SECURITY', 'REMOVE', 'STAFF AUGMENTATION',
                                               'INSPECTION/MONITORING/LAB SERVICES', 'TELECOMMUNICATIONS',
                                               'METER READING SERVICES', 'CHEMICALS/ADDITIVES/INDUSTRIAL GAS', ],
-                                  value='SMALL_COUNT_COMM_GROUPS', inplace=True)
+                                  value='SMALL GROUPS/OTHER', inplace=True)
 
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
@@ -125,7 +125,6 @@ def main():
             ORDER BY Supplier, datename(YEAR, Invoice_Date)             
 """
         input_df = pd.read_sql(data_query, engine)
-        input_df['Client'] = clientname
 
     # Case 2: Non-SPR Client, Rolled Up
     elif filename is not None:
@@ -136,7 +135,6 @@ def main():
             missinglist = [col for col in expected_columns if col not in input_df.columns]
             logging.info(f'The following columns were expected but not found: {missinglist}..')
             raise SystemExit()
-        input_df['Client'] = clientname
 
     # Case 3: Non-SPR Client, Raw
     elif filename2 is not None:
@@ -153,7 +151,6 @@ def main():
         counts = raw_df.groupby(['Supplier', 'Year'], as_index=False)['Invoice Date'].agg(np.size)
         input_df = pd.merge(sums, counts, on=['Supplier', 'Year']).rename(
             columns={'Gross Invoice Amount': 'Total_Invoice_Amount', 'Invoice Date': 'Total_Invoice_Count', })
-        input_df['Client'] = clientname
 
     # Null case
     else:
@@ -170,6 +167,18 @@ def main():
 
     # Clean up the supplier name string
     input_df['Cleaned'] = [helpers.clean_up_string(s) for s in input_df.Supplier.fillna('')]
+    input_df['Supplier'] = [s.strip() for s in input_df.Supplier]
+
+    # Reorder the columns
+    ordered_cols = [
+        'Supplier',
+        'Cleaned',
+        'Year',
+        'Total_Invoice_Amount',
+        'Total_Invoice_Count',
+        'Avg_Invoice_Size',
+    ]
+    input_df = input_df[ordered_cols]
 
     # Create unique list of suppliers
     logging.info('\nCreating unique list of suppliers...')
@@ -198,6 +207,7 @@ def main():
     # Create master dict mapping unmatched suppliers to lists of candidates and their scores
     candidates = {}
     # Find candidate matches with score above threshold for each unmatched supplier
+    # Todo: make this more readable
     for i, s in enumerate(unmatched_series):
         # Create a temp dict with {supplier_ref: fuzz_ ratio} key-value pairs
         d = {r: fuzz.ratio(s, r) for r in reference_series}
@@ -217,46 +227,65 @@ def main():
     count_soft_match = len(candidates)
     logging.info(f'\tFound potential soft-matches for {count_soft_match} suppliers')
 
-    #  Todo: deal with cases where there is more than one soft match--now just taking the first one...
+    #  Todo: deal with cases where there is more than one soft match
     soft_matched_dict = {item[0]: item[1][0] for item in candidates.items()}
 
-    # Add total invoice amount for soft_matches
+    # Add total invoice amount for soft_matches  Todo: refactor
     soft_matched_df = pd.DataFrame(soft_matched_dict).T \
         .merge(suppliers, left_index=True, right_on='Cleaned') \
         .rename(columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) \
-        .merge(input_df[['Cleaned', 'Total_Invoice_Amount']], on='Cleaned') \
+        .merge(input_df[['Cleaned', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year', ]], on='Cleaned') \
         .groupby(['Supplier', 'Cleaned', 'Supplier_ref', ]) \
-        .agg({'Softmatch_Score': 'min', 'Total_Invoice_Amount': 'sum'}) \
+        .agg({'Softmatch_Score': 'min',
+              'Total_Invoice_Amount': 'sum',
+              'Total_Invoice_Count': 'sum',
+              'Year': 'size',
+              }) \
+        .rename(columns={'Year': 'Year_Count'}) \
         .sort_values('Total_Invoice_Amount', ascending=False) \
         .reset_index()
     # best_matches.head(5)
 
     # Combine soft matches with unmatched suppliers
     if len(soft_matched_df) > 0:
-        soft_matched = soft_matched_df[['Supplier', 'Supplier_ref']]
+        soft_matched = soft_matched_df[['Supplier', 'Supplier_ref']].drop_duplicates()
         # Add best matches back to supplier list
-        xref = pd.concat([matched, soft_matched], axis=0, sort=True, ignore_index=True)
-        xref = xref.merge(cmdty_df, on='Supplier_ref')
+        matched = pd.concat([matched, soft_matched], axis=0, sort=True, ignore_index=True)
+        xref = matched.merge(cmdty_df, on='Supplier_ref')
         final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')
     else:
         xref = matched.merge(cmdty_df, on='Supplier_ref')
         final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')
 
     # Update commodities that are missing because they were unmatched
-    final_df['Commodity'].fillna('NOT_AVAILABLE', inplace=True)
+    final_df['Commodity'].fillna('NOT AVAILABLE', inplace=True)
 
     # Fill in Supplier_ref with blanks where not available
     final_df['Supplier_ref'].fillna('', inplace=True)
 
+    # Rearrange columns
+    ordered_cols = [
+        'Supplier',
+        'Supplier_ref',
+        'Commodity',
+        'Year',
+        'Total_Invoice_Amount',
+        'Total_Invoice_Count',
+        'Avg_Invoice_Size',
+    ]
+    final_df = final_df[ordered_cols].sort_values(['Supplier', 'Year'])
+
     # Only include supplier-years with invoices
-    final_df = final_df.loc[final_df.Total_Invoice_Count > 0, :]
+    final_df = final_df.loc[final_df.Total_Invoice_Amount > 0, :]
 
     # Output invoice amounts for unmatched suppliers
     # # Note: these are grouped by Supplier
     unmatched_df = final_df.loc[final_df.Supplier_ref == '', :] \
         .groupby('Supplier') \
-        .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum'}) \
-        .sort_values('Total_Invoice_Amount', ascending=False)
+        .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum', 'Year': 'size'}) \
+        .rename(columns={'Year': 'Year_Count'}) \
+        .sort_values('Total_Invoice_Amount', ascending=False) \
+        .reset_index()
     # unmatched_df.head(5)
 
     # Output invoice amounts for matched suppliers

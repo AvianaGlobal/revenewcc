@@ -69,5 +69,6 @@ def comm_read():
 
 
 def scard_read():
-    supplier_scorecard = pd.read_sql('SELECT * FROM Revenew.dbo.scorecard', engine)
+    # supplier_scorecard = pd.read_sql('SELECT * FROM Revenew.dbo.scorecard', engine)
+    supplier_scorecard = pd.read_csv('revenewCC/inputdata/scorecard.csv')
     return supplier_scorecard
