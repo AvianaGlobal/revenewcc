@@ -58,32 +58,32 @@ def main():
     logging.info(f'\nCurrent working directory: {os.getcwd()}')
     logging.info('\nSetting up workspace...')
 
-    # Read in all Resource Files
-    xref_query = "SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref"
-    cmdty_query = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
-    score_query = "SELECT Factor, Tier, Points FROM Revenew.dbo.scorecard"
-    score_cmdty_query = "SELECT Tier, Points FROM Revenew.dbo.scorecard WHERE Factor = 'Commodity'"
-    score_size_query = "SELECT Tier, Min, Max, Points FROM Revenew.dbo.scorecard WHERE Factor = 'InvoiceSize'"
-    score_count_query = "SELECT Tier, Min, Max, Points FROM Revenew.dbo.scorecard WHERE Factor = 'InvoiceCount'"
-    score_spend_query = "SELECT Tier, Min, Max, Points  FROM Revenew.dbo.scorecard WHERE Factor = 'Spend'"
-
-    # Load from database
-    xref_list = pd.read_sql(xref_query, engine)
-    cmdty_list = pd.read_sql(cmdty_query, engine)
-    scorecard = pd.read_sql(score_query, engine)
-    score_cmdty = pd.read_sql(score_cmdty_query, engine)
-    score_size = pd.read_sql(score_size_query, engine)
-    score_count = pd.read_sql(score_count_query, engine)
-    score_spend = pd.read_sql(score_spend_query, engine)
-
-    # Save to pickle
-    xref_list.to_pickle('revenewCC/inputdata/crossref.pkl')
-    cmdty_list.to_pickle('revenewCC/inputdata/commodity.pkl')
-    scorecard.to_pickle('revenewCC/inputdata/scorecard.pkl')
-    score_cmdty.to_pickle('revenewCC/inputdata/score_cmdty.pkl')
-    score_size.to_pickle('revenewCC/inputdata/score_size.pkl')
-    score_count.to_pickle('revenewCC/inputdata/score_count.pkl')
-    score_spend.to_pickle('revenewCC/inputdata/score_spend.pkl')
+    # # Read in all Resource Files
+    # xref_query = "SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref"
+    # cmdty_query = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
+    # score_query = "SELECT Factor, Tier, Points FROM Revenew.dbo.scorecard"
+    # score_cmdty_query = "SELECT Tier, Points FROM Revenew.dbo.scorecard WHERE Factor = 'Commodity'"
+    # score_size_query = "SELECT Tier, Min, Max, Points FROM Revenew.dbo.scorecard WHERE Factor = 'Avg_Invoice_Size'"
+    # score_count_query = "SELECT Tier, Min, Max, Points FROM Revenew.dbo.scorecard WHERE Factor = 'Total_Invoice_Count'"
+    # score_spend_query = "SELECT Tier, Min, Max, Points  FROM Revenew.dbo.scorecard WHERE Factor = 'Total_Invoice_Amount'"
+    #
+    # # Load from database
+    # xref_list = pd.read_sql(xref_query, engine)
+    # cmdty_list = pd.read_sql(cmdty_query, engine)
+    # scorecard = pd.read_sql(score_query, engine)
+    # score_cmdty = pd.read_sql(score_cmdty_query, engine)
+    # score_size = pd.read_sql(score_size_query, engine)
+    # score_count = pd.read_sql(score_count_query, engine)
+    # score_spend = pd.read_sql(score_spend_query, engine)
+    #
+    # # Save to pickle
+    # xref_list.to_pickle('revenewCC/inputdata/crossref.pkl')
+    # cmdty_list.to_pickle('revenewCC/inputdata/commodity.pkl')
+    # scorecard.to_pickle('revenewCC/inputdata/scorecard.pkl')
+    # score_cmdty.to_pickle('revenewCC/inputdata/score_cmdty.pkl')
+    # score_size.to_pickle('revenewCC/inputdata/score_size.pkl')
+    # score_count.to_pickle('revenewCC/inputdata/score_count.pkl')
+    # score_spend.to_pickle('revenewCC/inputdata/score_spend.pkl')
 
     # Load from pickle
     xref_list = pd.read_pickle('revenewCC/inputdata/crossref.pkl')
@@ -95,14 +95,19 @@ def main():
     score_spend = pd.read_pickle('revenewCC/inputdata/score_spend.pkl')
 
     # Merge crossref and commodities
-    cmdty_df = pd.merge(xref_list, cmdty_list, on=['Supplier'], how='left').groupby(
-        ['Supplier_ref', 'Commodity']).size().reset_index(name='Freq')[['Supplier_ref', 'Commodity']]
+    cmdty_df = (pd
+        .merge(xref_list, cmdty_list, on=['Supplier'], how='left')
+        .groupby(['Supplier_ref', 'Commodity'])
+        .size()
+        .reset_index(name='Freq')
+    [['Supplier_ref', 'Commodity']])
 
     # clean up
-    cmdty_df['Commodity'].replace(to_replace=['FACILITIES MAINTENANCE/SECURITY', 'REMOVE', 'STAFF AUGMENTATION',
-                                              'INSPECTION/MONITORING/LAB SERVICES', 'TELECOMMUNICATIONS',
-                                              'METER READING SERVICES', 'CHEMICALS/ADDITIVES/INDUSTRIAL GAS', ],
-                                  value='SMALL GROUPS/OTHER', inplace=True)
+    cmdty_df['Commodity'].replace(to_replace=[
+        'FACILITIES MAINTENANCE/SECURITY', 'REMOVE', 'STAFF AUGMENTATION',
+        'INSPECTION/MONITORING/LAB SERVICES', 'TELECOMMUNICATIONS',
+        'METER READING SERVICES', 'CHEMICALS/ADDITIVES/INDUSTRIAL GAS',
+    ], value='SMALL GROUPS/OTHER', inplace=True)
 
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
@@ -302,6 +307,13 @@ def main():
 
     # Scorecard computations  # Fixme
     logging.info('\nCalculating supplier scores based on scorecard...')
+
+    final_df['Score_Commodity'] = 0
+    final_df['Score_Avg_Invoice_Size'] = 0
+    final_df['Score_Total_Invoice_Count'] = 0
+    final_df['Score_Total_Invoice_Amount'] = 0
+
+    dict(score_cmdty.to_dict('split')['data'])
 
     # STEP 8b: do a full outer join with the scorecard
     final_df['key'] = 1

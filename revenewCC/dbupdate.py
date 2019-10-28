@@ -11,7 +11,7 @@ def dbconnect():
         port = '51949'
         user = 'sa'
         password = 'Aviana$92821'
-        database = 'AvianaML'
+        database = 'Revenew'
         driver = '/usr/local/lib/libmsodbcsql.13.dylib'
         cnxn_str = f'mssql+pyodbc://{user}:{password}@{host}:{port}/{database}?driver={driver}'
     else:
