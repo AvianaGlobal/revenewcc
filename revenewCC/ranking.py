@@ -62,37 +62,21 @@ def main():
     # xref_query = "SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref"
     # cmdty_query = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
     # score_query = "SELECT Factor, Tier, Points FROM Revenew.dbo.scorecard"
-    # score_cmdty_query = "SELECT Tier, Points FROM Revenew.dbo.scorecard WHERE Factor = 'Commodity'"
-    # score_size_query = "SELECT Tier, Min, Max, Points FROM Revenew.dbo.scorecard WHERE Factor = 'Avg_Invoice_Size'"
-    # score_count_query = "SELECT Tier, Min, Max, Points FROM Revenew.dbo.scorecard WHERE Factor = 'Total_Invoice_Count'"
-    # score_spend_query = "SELECT Tier, Min, Max, Points  FROM Revenew.dbo.scorecard WHERE Factor = 'Total_Invoice_Amount'"
     #
     # # Load from database
     # xref_list = pd.read_sql(xref_query, engine)
     # cmdty_list = pd.read_sql(cmdty_query, engine)
     # scorecard = pd.read_sql(score_query, engine)
-    # score_cmdty = pd.read_sql(score_cmdty_query, engine)
-    # score_size = pd.read_sql(score_size_query, engine)
-    # score_count = pd.read_sql(score_count_query, engine)
-    # score_spend = pd.read_sql(score_spend_query, engine)
     #
     # # Save to pickle
     # xref_list.to_pickle('revenewCC/inputdata/crossref.pkl')
     # cmdty_list.to_pickle('revenewCC/inputdata/commodity.pkl')
     # scorecard.to_pickle('revenewCC/inputdata/scorecard.pkl')
-    # score_cmdty.to_pickle('revenewCC/inputdata/score_cmdty.pkl')
-    # score_size.to_pickle('revenewCC/inputdata/score_size.pkl')
-    # score_count.to_pickle('revenewCC/inputdata/score_count.pkl')
-    # score_spend.to_pickle('revenewCC/inputdata/score_spend.pkl')
 
     # Load from pickle
     xref_list = pd.read_pickle('revenewCC/inputdata/crossref.pkl')
     cmdty_list = pd.read_pickle('revenewCC/inputdata/commodity.pkl')
     scorecard = pd.read_pickle('revenewCC/inputdata/scorecard.pkl')
-    score_cmdty = pd.read_pickle('revenewCC/inputdata/score_cmdty.pkl')
-    score_size = pd.read_pickle('revenewCC/inputdata/score_size.pkl')
-    score_count = pd.read_pickle('revenewCC/inputdata/score_count.pkl')
-    score_spend = pd.read_pickle('revenewCC/inputdata/score_spend.pkl')
 
     # Merge crossref and commodities
     cmdty_df = (pd
@@ -104,9 +88,13 @@ def main():
 
     # clean up
     cmdty_df['Commodity'].replace(to_replace=[
-        'FACILITIES MAINTENANCE/SECURITY', 'REMOVE', 'STAFF AUGMENTATION',
-        'INSPECTION/MONITORING/LAB SERVICES', 'TELECOMMUNICATIONS',
-        'METER READING SERVICES', 'CHEMICALS/ADDITIVES/INDUSTRIAL GAS',
+        'FACILITIES MAINTENANCE/SECURITY',
+        'REMOVE',
+        'STAFF AUGMENTATION',
+        'INSPECTION/MONITORING/LAB SERVICES',
+        'TELECOMMUNICATIONS',
+        'METER READING SERVICES',
+        'CHEMICALS/ADDITIVES/INDUSTRIAL GAS',
     ], value='SMALL COUNT/OTHER', inplace=True)
 
     # Read in the new client data
@@ -266,7 +254,7 @@ def main():
     final_df['Commodity'].fillna('NOT AVAILABLE', inplace=True)
 
     # Fill in Supplier_ref with blanks where not available
-    final_df['Supplier_ref'].fillna('', inplace=True)
+    final_df['Supplier_ref'].str.upper().fillna('', inplace=True)
 
     # Rearrange columns
     ordered_cols = [
@@ -281,11 +269,10 @@ def main():
     final_df = final_df[ordered_cols].sort_values(['Supplier', 'Year'])
 
     # Only include supplier-years with invoices
-    final_df = final_df.loc[final_df.Total_Invoice_Amount > 0, :]
+    final_df = final_df[final_df.Total_Invoice_Amount > 0]
 
-    # Output invoice amounts for unmatched suppliers
-    # # Note: these are grouped by Supplier
-    unmatched_df = final_df.loc[final_df.Supplier_ref == '', :] \
+    # Output invoice amounts for unmatched suppliers  # # Note: these are grouped by Supplier
+    unmatched_df = final_df[final_df.Supplier_ref == ''] \
         .groupby('Supplier') \
         .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum', 'Year': 'size'}) \
         .rename(columns={'Year': 'Year_Count'}) \
@@ -293,9 +280,8 @@ def main():
         .reset_index()
     # unmatched_df.head(5)
 
-    # Output invoice amounts for matched suppliers
-    # # Note these are grouped by Supplier_ref
-    matched_df = final_df.loc[final_df.Supplier_ref != '', :] \
+    # Output invoice amounts for matched suppliers  # # Note these are grouped by Supplier_ref
+    matched_df = final_df[final_df.Supplier_ref != ''] \
         .groupby(['Supplier_ref']) \
         .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum', 'Year': 'size'}) \
         .rename(columns={'Year': 'Year_Count'}) \
@@ -372,7 +358,7 @@ def main():
     year_scores = factor_scores \
         .drop_duplicates(['Supplier', 'Supplier_ref', 'Year', 'Factor']) \
         .set_index(['Supplier', 'Supplier_ref', 'Year', 'Factor', 'Tier'], verify_integrity=True) \
-        .unstack(level=['Year', 'Factor', 'Tier'])
+        .unstack(level=['Factor', 'Tier', 'Year',])
 
     # Create a Pandas Excel writer using XlSXWriter as the engine.
     logging.info(f'\nWriting output file to {outputdir}...')

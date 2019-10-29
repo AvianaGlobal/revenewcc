@@ -1,5 +1,6 @@
 include LICENSE
 include revenewCC/inputdata/*.csv
+include revenewCC/inputdata/*.pkl
 include gooey/images/*.png
 include gooey/languages/*.json
 include gooey/tests/*.json

@@ -1,4 +1,4 @@
-dsn = "revcc"
+dsn = "rev"
 user = 'sa'
 password = 'Aviana$92821'
 cnxn_dsn = f'mssql+pyodbc://{user}:{password}@{dsn}'
