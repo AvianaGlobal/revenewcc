@@ -159,8 +159,8 @@ def main():
     input_df['Avg_Invoice_Size'] = input_df['Total_Invoice_Amount'].div(input_df['Total_Invoice_Count'])
 
     # Clean up the supplier name string
-    input_df['Cleaned'] = [helpers.clean_up_string(s) for s in input_df.Supplier.fillna('')]
-    input_df['Supplier'] = [s.strip() for s in input_df.Supplier]
+    input_df['Supplier'] = [splr.strip() for splr in input_df.Supplier]
+    input_df['Cleaned'] = [helpers.clean_up_string(splr) for splr in input_df.Supplier]
 
     # Reorder the columns
     ordered_cols = [
@@ -184,7 +184,8 @@ def main():
     combined = pd.merge(suppliers, xref_list, on='Supplier', how='outer', indicator=True)
     unmatched = combined[combined['_merge'] == 'left_only'].drop(columns=['_merge', 'Supplier_ref'])
     matched = combined[combined['_merge'] == 'both'].drop(columns=['_merge', 'Cleaned'])
-    count_total, count_matched, count_unmatched = len(matched) + len(unmatched), len(matched), len(unmatched)
+    count_matched, count_unmatched = len(matched), len(unmatched)
+    count_total = count_matched + count_unmatched
     # combined.head(5)
     # unmatched.head(5)
     # matched.head(5)
@@ -211,10 +212,10 @@ def main():
             # Update master dict with soft_match
             candidates[s] = k
         # Output progress through list of unmatched suppliers
-        progress = round(100 * ((i + 1) / count_unmatched), 1)
+        p = round(100 * ((i + 1) / count_unmatched), 1)
         # Only print every 250 iterations
         if i % 250 == 0:
-            out = f'{i} complete of {count_unmatched} ({progress}%)'
+            out = f'{i} complete of {count_unmatched} ({p}%)'
             logging.info(out)
 
     count_soft_match = len(candidates)
@@ -287,7 +288,7 @@ def main():
         .rename(columns={'Year': 'Year_Count'}) \
         .sort_values('Total_Invoice_Amount', ascending=False) \
         .reset_index() \
-        .merge(matched)
+        .merge(matched)  # Have to re-merge the input data to get original supplier name
     matched_df['Supplier_ref'] = matched_df['Supplier_ref'].str.upper()
     # matched_df.head(5)
 
