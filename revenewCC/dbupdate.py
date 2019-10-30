@@ -1,5 +1,5 @@
 import sys
-import sqlite3
+
 import pandas as pd
 from tqdm import tqdm
 
@@ -25,9 +25,6 @@ def dbconnect():
     engine = create_engine(cnxn_str)
     return engine.connect()
 
-
-def sqliteconnect():
-    return sqlite3.connect('revenewCC/inputdata/revenewCC.db')
 
 # Set up data connection
 engine = dbconnect()

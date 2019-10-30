@@ -11,8 +11,6 @@ tests/
 \.DS_Store
 /**/*.pyc
 /**/*.parquet
-/**/*.txt
-/**/*.xlsx
-/revenewCC/inputdata/TestMissingColumns.csv
 /revenewCC/inputdata/QEP2019_invoice.csv
 /**/.eggs/
+/**/log.txt
