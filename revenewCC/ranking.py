@@ -11,9 +11,10 @@ def main():
     dsn = args.dsn
     clientname = args.clientname
     database = args.database
-    outputdir = args.outputdir
     filename = args.filename
     filename2 = args.filename2
+    outputdir = args.outputdir
+    threshold = 89
 
     # Import packages
     import os
@@ -273,7 +274,7 @@ def main():
     final_df = final_df[final_df.Total_Invoice_Amount > 0]
 
     # Output invoice amounts for unmatched suppliers  # # Note: these are grouped by Supplier
-    unmatched_df = final_df[final_df.Supplier_ref.isna()] \
+    unmatched_df = final_df[final_df.Supplier_ref == ''] \
         .groupby('Supplier') \
         .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum', 'Year': 'size'}) \
         .rename(columns={'Year': 'Year_Count'}) \
@@ -282,17 +283,26 @@ def main():
     # unmatched_df.head(5)
 
     # Output invoice amounts for matched suppliers  # # Note these are grouped by Supplier_ref
-    matched_df = final_df.loc[final_df.Supplier_ref != '', :] \
+    matched_df = final_df[final_df.Supplier_ref != ''] \
         .groupby(['Supplier_ref']) \
         .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum', 'Year': 'size'}) \
         .rename(columns={'Year': 'Year_Count'}) \
         .sort_values('Total_Invoice_Amount', ascending=False) \
         .reset_index() \
         .merge(matched)  # Have to re-merge the input data to get original supplier name
+    matched_df['Supplier_ref'] = matched_df['Supplier_ref'].str.upper()
     # matched_df.head(5)
 
     # Scorecard computations  # Fixme
     logging.info('\nCalculating supplier scores based on scorecard...')
+
+    # final_df['Score_Commodity'] = [dict(score_cmdty.to_dict('split')['data']).get(s) for s in final_df.Commodity]
+    # final_df['Score_Avg_Invoice_Size'] = 0
+    # final_df['Tier_Avg_Invoice_Size'] = ''
+    # final_df['Score_Total_Invoice_Count'] = 0
+    # final_df['Tier_Total_Invoice_Count'] = ''
+    # final_df['Score_Total_Invoice_Amount'] = 0
+    # final_df['Tier_Total_Invoice_Amount'] = ''
 
     # STEP 8b: do a full outer join with the scorecard
     final_df['key'] = 1
@@ -344,15 +354,13 @@ def main():
         .reset_index()
 
     # score at supplier-year-factor-tier level
-    factor_scores['Supplier'].update(factor_scores.Supplier_ref)
-    factor_scores['Supplier'] = [s.upper() for s in factor_scores.Supplier]
-    factor_scores.drop(columns='Supplier_ref', inplace=True)
+    factor_scores['Supplier_ref'] = [s.upper() for s in factor_scores.Supplier_ref]
 
     # score at supplier-year level Fixme
-    year_scores = factor_scores[['Supplier', 'Year', 'Factor', 'Points']] \
-        .drop_duplicates(['Supplier', 'Year', 'Factor']) \
-        .set_index(['Supplier', 'Year', 'Factor',], verify_integrity=True) \
-        .unstack(level=['Year',])
+    year_scores = factor_scores \
+        .drop_duplicates(['Supplier', 'Supplier_ref', 'Year', 'Factor']) \
+        .set_index(['Supplier', 'Supplier_ref', 'Year', 'Factor', 'Tier'], verify_integrity=True) \
+        .unstack(level=['Factor', 'Tier', 'Year',])
 
     # Create a Pandas Excel writer using XlSXWriter as the engine.
     logging.info(f'\nWriting output file to {outputdir}...')
