@@ -71,12 +71,12 @@ def main():
     #
     # # Save to pickle
     # xref_list.to_pickle('revenewCC/inputdata/crossref.pkl')
-    # cmdty_list.to_pickle('revenewCC/inputdata/commodity.pkl')
+    # cmdty_list.to_pickle('revenewCC/inputdata/commodities.pkl')
     # scorecard.to_pickle('revenewCC/inputdata/scorecard.pkl')
 
     # Load from pickle
     xref_list = pd.read_pickle('revenewCC/inputdata/crossref.pkl')
-    cmdty_list = pd.read_pickle('revenewCC/inputdata/commodity.pkl')
+    cmdty_list = pd.read_pickle('revenewCC/inputdata/commodities.pkl')
     scorecard = pd.read_pickle('revenewCC/inputdata/scorecard.pkl')
 
     # Merge crossref and commodities
