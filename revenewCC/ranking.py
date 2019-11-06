@@ -326,8 +326,8 @@ def main():
 
     # STEP 8d: # append all the factor scores
     scores = pd.concat([spend, size, count, commodity], axis=0, sort=False, ignore_index=True) \
-        .sort_values(['Supplier', 'Factor', 'Year']) \
-        .set_index(['Supplier', 'Supplier_ref', 'Year', 'Factor',  ])
+        .set_index(['Supplier', 'Supplier_ref', 'Year', 'Factor',  ]) \
+        .sort_index()
 
     # We were asked to re-capitalize supplier names
 
@@ -356,16 +356,21 @@ def main():
         .set_index(['Supplier', 'Year', 'Factor',], verify_integrity=True) \
         .unstack(level=['Year',])
 
+    # total accross all years
     total_scores = year_scores.stack() \
         .reset_index() \
         .groupby(['Supplier']) \
         .agg({'Points': 'sum', 'Year': ['min', 'max']}) \
         .sort_values(('Points', 'sum'), ascending=False)
 
-
-    factor_scores = factor_scores.set_index(['Supplier', 'Year', 'Factor'])
+    # clean up column names
     total_scores.columns = [' '.join(col).strip().title() for col in total_scores.columns.values]
+
+    # output supplier rank
     total_scores['Supplier Rank'] = total_scores['Points Sum'].rank(method='max', ascending=False)
+
+    # update format
+    factor_scores = factor_scores.set_index(['Supplier', 'Year', 'Factor']).sort_index()
 
     # Create a Pandas Excel writer using XlSXWriter as the engine.
     logging.info(f'\nWriting output file to {outputdir}...')
