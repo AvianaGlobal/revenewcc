@@ -239,7 +239,7 @@ def main():
         .sort_values('Total_Invoice_Amount', ascending=False) \
         .reset_index()
     # best_matches.head(5)
-    soft_matched_df['Supplier_ref'].str.upper().fillna('', inplace=True)
+    soft_matched_df['Supplier_ref'] = soft_matched_df.Supplier_ref.str.upper().fillna('')
 
     # Combine soft matches with unmatched suppliers
     if len(soft_matched_df) > 0:
@@ -374,7 +374,7 @@ def main():
     matched_df.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
     unmatched_df.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
     soft_matched_df.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
-    scorecard.to_excel(writer, sheet_name='Score_Card', index=False)
+    scorecard.drop(columns='key').to_excel(writer, sheet_name='Score_Card', index=False)
     scores.to_excel(writer, sheet_name='Supplier_Scores')
     factor_scores.to_excel(writer, sheet_name='Component_Scores')
     year_scores.to_excel(writer, sheet_name='Year_Scores')
