@@ -38,7 +38,7 @@ def main():
             password = 'Aviana$92821'
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
     elif sys.platform == 'win32':
-        if os.environ['USERNAME'] == 'mj':
+        if os.environ['USERNAME'] in ['mj', 'MichaelJohnson']:
             user = 'sa'
             password = 'Aviana$92821'
             cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
