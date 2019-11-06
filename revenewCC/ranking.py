@@ -224,7 +224,7 @@ def main():
     #  Todo: deal with cases where there is more than one soft match
     soft_matched_dict = {item[0]: item[1][0] for item in candidates.items()}
 
-    # Add total invoice amount for soft_matches  Todo: refactor
+    # Add total invoice amount for soft_matches
     soft_matched_df = pd.DataFrame(soft_matched_dict).T \
         .merge(suppliers, left_index=True, right_on='Cleaned') \
         .rename(columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) \
@@ -239,6 +239,7 @@ def main():
         .sort_values('Total_Invoice_Amount', ascending=False) \
         .reset_index()
     # best_matches.head(5)
+    soft_matched_df['Supplier_ref'].str.upper().fillna('', inplace=True)
 
     # Combine soft matches with unmatched suppliers
     if len(soft_matched_df) > 0:
@@ -289,6 +290,7 @@ def main():
         .sort_values('Total_Invoice_Amount', ascending=False) \
         .reset_index() \
         .merge(matched)  # Have to re-merge the input data to get original supplier name
+    matched_df['Supplier_ref'] = [s.upper() for s in matched_df.Supplier_ref]
     # matched_df.head(5)
 
     # Scorecard computations  # Fixme
@@ -325,7 +327,7 @@ def main():
     # STEP 8d: # append all the factor scores
     scores = pd.concat([spend, size, count, commodity], axis=0, sort=False, ignore_index=True) \
         .sort_values(['Supplier', 'Factor', 'Year']) \
-        .set_index(['Supplier', 'Supplier_ref', 'Year', 'Factor'])
+        .set_index(['Supplier', 'Supplier_ref', 'Year', 'Factor',  ])
 
     # We were asked to re-capitalize supplier names
 
@@ -348,11 +350,22 @@ def main():
     factor_scores['Supplier'] = [s.upper() for s in factor_scores.Supplier]
     factor_scores.drop(columns='Supplier_ref', inplace=True)
 
-    # score at supplier-year level Fixme
+    # score at supplier-year level
     year_scores = factor_scores[['Supplier', 'Year', 'Factor', 'Points']] \
         .drop_duplicates(['Supplier', 'Year', 'Factor']) \
         .set_index(['Supplier', 'Year', 'Factor',], verify_integrity=True) \
         .unstack(level=['Year',])
+
+    total_scores = year_scores.stack() \
+        .reset_index() \
+        .groupby(['Supplier']) \
+        .agg({'Points': 'sum', 'Year': ['min', 'max']}) \
+        .sort_values(('Points', 'sum'), ascending=False)
+
+
+    factor_scores = factor_scores.set_index(['Supplier', 'Year', 'Factor'])
+    total_scores.columns = [' '.join(col).strip().title() for col in total_scores.columns.values]
+    total_scores['Supplier Rank'] = total_scores['Points Sum'].rank(method='max', ascending=False)
 
     # Create a Pandas Excel writer using XlSXWriter as the engine.
     logging.info(f'\nWriting output file to {outputdir}...')
@@ -361,9 +374,12 @@ def main():
     matched_df.to_excel(writer, sheet_name='CrossRef_Matched_Suppliers', index=False)
     unmatched_df.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
     soft_matched_df.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
-    scorecard.to_excel(writer, sheet_name='SupplierScoreCard', index=False)
-    factor_scores.to_excel(writer, sheet_name='Component_Scores', index=False)
+    scorecard.to_excel(writer, sheet_name='Score_Card', index=False)
+    scores.to_excel(writer, sheet_name='Supplier_Scores')
+    factor_scores.to_excel(writer, sheet_name='Component_Scores')
     year_scores.to_excel(writer, sheet_name='Year_Scores')
+    total_scores.to_excel(writer, sheet_name='Supplier_Rank')
+
     writer.save()
 
     # Stop timer
