@@ -2,7 +2,7 @@
 from gooey import Gooey
 
 
-@Gooey(program_name='\nRevenewML\nCC Supplier Ranking\n', default_size=(700, 700), image_dir='::gooey/default',
+@Gooey(program_name='Revenew CC Supplier Ranking', image_dir='::gooey/default',
        language_dir='gooey/languages', )
 def main():
     # Parse User inputs
