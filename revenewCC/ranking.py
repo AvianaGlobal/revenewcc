@@ -380,7 +380,7 @@ def main():
     unmatched_df.to_excel(writer, sheet_name='CrossRef_unMatched_Suppliers', index=False)
     soft_matched_df.to_excel(writer, sheet_name='SoftMatched_Suppliers', index=False)
     scorecard.drop(columns='key').to_excel(writer, sheet_name='Score_Card', index=False)
-    scores.to_excel(writer, sheet_name='Supplier_Scores')
+    scores.reset_index().to_excel(writer, sheet_name='Supplier_Scores', index=False)
     factor_scores.to_excel(writer, sheet_name='Component_Scores')
     year_scores.to_excel(writer, sheet_name='Year_Scores')
     total_scores.to_excel(writer, sheet_name='Supplier_Rank')

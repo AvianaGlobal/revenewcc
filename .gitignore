@@ -8,9 +8,11 @@ dist/
 venv/
 docs/
 tests/
+etc/
 \.DS_Store
 /**/*.pyc
 /**/*.parquet
 /revenewCC/inputdata/QEP2019_invoice.csv
 /**/.eggs/
 /**/log.txt
+/**/*.lnk
