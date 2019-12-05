@@ -5,7 +5,7 @@ __pycache__/
 \.vscode
 build/
 dist/
-venv/
+env/
 docs/
 tests/
 etc/
