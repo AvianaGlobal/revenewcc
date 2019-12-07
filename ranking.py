@@ -2,7 +2,7 @@
 from gooey import Gooey, GooeyParser
 
 
-@Gooey(program_name='Revenew CC Supplier Ranking')
+@Gooey(program_name='Revenew\nCC Supplier Ranking')
 def main():
     parser = GooeyParser()
     parser.add_argument('clientname', metavar='Client Name')
@@ -33,7 +33,6 @@ def main():
 
     # Import packages
     import os
-    import sys
     import time
     import logging
     import numpy as np
@@ -41,7 +40,7 @@ def main():
     from fuzzywuzzy import fuzz
     from sqlalchemy import create_engine
     from timeit import default_timer as timer
-    from ranking import helpers
+    import helpers
 
     # Set default threshold for soft-matching
     threshold = 89
@@ -66,9 +65,9 @@ def main():
     logging.info('\nSetting up workspace...')
 
     # # Read in all Resource Files
-    xref_list = pd.read_pickle('./ranking/inputdata/crossref.pkl')
-    cmdty_list = pd.read_pickle('./ranking/inputdata/commodity.pkl')
-    scorecard = pd.read_pickle('./ranking/inputdata/scorecard.pkl')
+    xref_list = pd.read_pickle('./inputdata/crossref.pkl')
+    cmdty_list = pd.read_pickle('./inputdata/commodity.pkl')
+    scorecard = pd.read_pickle('./inputdata/scorecard.pkl')
 
     # Merge crossref and commodities
     cmdty_df = (pd

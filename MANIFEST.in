@@ -1,9 +1,0 @@
-include LICENSE
-include ./ranking/inputdata/*.csv
-include ./ranking/inputdata/*.pkl
-include ./gooey/images/*.png
-include ./gooey/images/*.ico
-include ./gooey/images/*.jpg
-include ./gooey/images/*.gif
-include ./gooey/languages/*.json
-include ./gooey/tests/*.json

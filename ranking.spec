@@ -1,27 +1,22 @@
-# -*- mode: python ; coding: utf-8 -*-
 
-block_cipher = None
-
-
-a = Analysis(['./ranking/ranking.py'],
+a = Analysis(['./ranking.py'],
              pathex=['C:/Users/MichaelJohnson/revenewcc'],
+             binaries=['C:/Users/MichaelJohnson/Anaconda3/envs/revenew', '.'],
              datas=[
     	        ('./LICENSE', '.'),
-            	('./MANIFEST.in', '.'),
-             	('./ranking/inputdata/*.csv', './ranking/inputdata'),
-             	('./ranking/inputdata/*.xlsx', './ranking/inputdata'),
-             	('./ranking/inputdata/*.pkl', './ranking/inputdata'),
-             	('./ranking/gooey/images/*.png', './ranking/gooey/images'),
-             	('./ranking/gooey/images/*.ico', './ranking/gooey/images'),
-             	('./ranking/gooey/images/*.gif', './ranking/gooey/images'),
-             	('./ranking/gooey/languages/*.json', './ranking/gooey/languages'),
+             	('./inputdata/*.csv', './inputdata'),
+             	('./inputdata/*.xlsx', './inputdata'),
+             	('./inputdata/*.pkl', './inputdata'),
+             	('./gooey/images/*.png', './gooey/images'),
+             	('./gooey/images/*.ico', './gooey/images'),
+             	('./gooey/images/*.gif', './gooey/images'),
+             	('./gooey/languages/*.json', './gooey/languages'),
              ],
-             win_no_prefer_redirects=False,
-             win_private_assemblies=False,
-             cipher=block_cipher,
+             hiddenimports=['pyodbc'],
+             win_no_prefer_redirects=True,
+             win_private_assemblies=True,
              noarchive=False)
-pyz = PYZ(a.pure, a.zipped_data,
-             cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data)
 exe = EXE(pyz,
           a.scripts,
           [],
@@ -30,13 +25,13 @@ exe = EXE(pyz,
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
-          upx=True,
-          console=True)
+          upx=False,
+          console=False)
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,
                a.datas,
                strip=False,
-               upx=True,
+               upx=False,
                upx_exclude=[],
                name='ranking')
