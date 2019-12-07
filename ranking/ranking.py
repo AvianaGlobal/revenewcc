@@ -1,16 +1,32 @@
 #!/usr/bin/env python
-from ranking.gooey import Gooey
+from gooey import Gooey, GooeyParser
 
 
-@Gooey(program_name='Revenew CC Supplier Ranking', image_dir='::gooey/default',
-       language_dir='./ooey/languages', )
+@Gooey(program_name='Revenew CC Supplier Ranking')
 def main():
+    parser = GooeyParser()
+    parser.add_argument('clientname', metavar='Client Name')
+    parser.add_argument('outputdir', metavar='Output Folder', widget='DirChooser')
+
+    spr_grp = parser.add_argument_group('Option 1: SPR Client')
+    spr_grp.add_argument('--dsn', metavar='DSN')
+    spr_grp.add_argument('--database', metavar='Database')
+    spr_grp.add_argument('--username', metavar='Username')
+    spr_grp.add_argument('--password', metavar='Password', widget='PasswordField')
+
+    nonspr_grp = parser.add_argument_group('Option 2: Non-SPR Client')
+    nonspr_grp.add_argument('--filename', metavar='Rolled Up', widget='FileChooser',
+                            help='Columns: Supplier, Year, Total_Invoice_Amount, Total_Invoice_Count')
+    nonspr_grp.add_argument('--filename2', metavar='Raw', widget='FileChooser',
+                            help='Columns: Vendor Name, Invoice Date, Gross Invoice Amount')
+
     # Parse User inputs
-    from ranking.argparser import parser
     args = parser.parse_args()
     dsn = args.dsn
     clientname = args.clientname
     database = args.database
+    username = args.username
+    password = args.password
     outputdir = args.outputdir
     filename = args.filename
     filename2 = args.filename2
@@ -31,7 +47,7 @@ def main():
     threshold = 89
 
     # Make database connection engine (with debug settings)
-    cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
+    cnxn_str = f'mssql+pyodbc://{username}:{password}@{dsn}'
     engine = create_engine(cnxn_str, fast_executemany=True, isolation_level='AUTOCOMMIT')
     if dsn:
         engine.connect()
@@ -50,9 +66,9 @@ def main():
     logging.info('\nSetting up workspace...')
 
     # # Read in all Resource Files
-    xref_list = pd.read_pickle('ranking/inputdata/crossref.pkl')
-    cmdty_list = pd.read_pickle('ranking/inputdata/commodity.pkl')
-    scorecard = pd.read_pickle('ranking/inputdata/scorecard.pkl')
+    xref_list = pd.read_pickle('./ranking/inputdata/crossref.pkl')
+    cmdty_list = pd.read_pickle('./ranking/inputdata/commodity.pkl')
+    scorecard = pd.read_pickle('./ranking/inputdata/scorecard.pkl')
 
     # Merge crossref and commodities
     cmdty_df = (pd
@@ -63,9 +79,9 @@ def main():
     [['Supplier_ref', 'Commodity']])
 
     # clean up
-    cmdty_df['Commodity'].replace(to_replace=[ 'FACILITIES MAINTENANCE/SECURITY', 'REMOVE', 'STAFF AUGMENTATION',
-                                               'INSPECTION/MONITORING/LAB SERVICES', 'TELECOMMUNICATIONS',
-                                               'METER READING SERVICES' 'CHEMICALS/ADDITIVES/INDUSTRIAL GAS', ],
+    cmdty_df['Commodity'].replace(to_replace=['FACILITIES MAINTENANCE/SECURITY', 'REMOVE', 'STAFF AUGMENTATION',
+                                              'INSPECTION/MONITORING/LAB SERVICES', 'TELECOMMUNICATIONS',
+                                              'METER READING SERVICES' 'CHEMICALS/ADDITIVES/INDUSTRIAL GAS', ],
                                   value='SMALL COUNT/OTHER', inplace=True)
 
     # Read in the new client data
