@@ -3,7 +3,7 @@ from ranking.gooey import Gooey
 
 
 @Gooey(program_name='Revenew CC Supplier Ranking', image_dir='::gooey/default',
-       language_dir='gooey/languages', )
+       language_dir='./ooey/languages', )
 def main():
     # Parse User inputs
     from ranking.argparser import parser
@@ -31,23 +31,14 @@ def main():
     threshold = 89
 
     # Make database connection engine (with debug settings)
-    cnxn_str = f'mssql+pyodbc://@{dsn}'
-    if sys.platform == 'darwin':
-        if os.environ['USER'] == 'mj':
-            user = 'sa'
-            password = 'Aviana$92821'
-            cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
-    elif sys.platform == 'win32':
-        if os.environ['USERNAME'] in ['mj', 'MichaelJohnson']:
-            user = 'sa'
-            password = 'Aviana$92821'
-            cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
+    cnxn_str = f'mssql+pyodbc://{user}:{password}@{dsn}'
     engine = create_engine(cnxn_str, fast_executemany=True, isolation_level='AUTOCOMMIT')
-    engine.connect()
+    if dsn:
+        engine.connect()
 
     # Set up logging
     start = timer()
-    log_file = 'log.txt'
+    log_file = './log.txt'
     logging.basicConfig(filename=log_file, level=logging.DEBUG)
     handler = logging.StreamHandler()
     logger = logging.getLogger()
@@ -59,21 +50,6 @@ def main():
     logging.info('\nSetting up workspace...')
 
     # # Read in all Resource Files
-    # xref_query = "SELECT Supplier, Supplier_ref FROM Revenew.dbo.crossref"
-    # cmdty_query = "SELECT Supplier, Commodity FROM Revenew.dbo.commodities"
-    # score_query = "SELECT Factor, Tier, Points FROM Revenew.dbo.scorecard"
-    #
-    # # Load from database
-    # xref_list = pd.read_sql(xref_query, engine)
-    # cmdty_list = pd.read_sql(cmdty_query, engine)
-    # scorecard = pd.read_sql(score_query, engine)
-    #
-    # # Save to pickle
-    # xref_list.to_pickle('ranking/inputdata/crossref.pkl')
-    # cmdty_list.to_pickle('ranking/inputdata/commodity.pkl')
-    # scorecard.to_pickle('ranking/inputdata/scorecard.pkl')
-
-    # Load from pickle
     xref_list = pd.read_pickle('ranking/inputdata/crossref.pkl')
     cmdty_list = pd.read_pickle('ranking/inputdata/commodity.pkl')
     scorecard = pd.read_pickle('ranking/inputdata/scorecard.pkl')
@@ -87,15 +63,10 @@ def main():
     [['Supplier_ref', 'Commodity']])
 
     # clean up
-    cmdty_df['Commodity'].replace(to_replace=[
-        'FACILITIES MAINTENANCE/SECURITY',
-        'REMOVE',
-        'STAFF AUGMENTATION',
-        'INSPECTION/MONITORING/LAB SERVICES',
-        'TELECOMMUNICATIONS',
-        'METER READING SERVICES',
-        'CHEMICALS/ADDITIVES/INDUSTRIAL GAS',
-    ], value='SMALL COUNT/OTHER', inplace=True)
+    cmdty_df['Commodity'].replace(to_replace=[ 'FACILITIES MAINTENANCE/SECURITY', 'REMOVE', 'STAFF AUGMENTATION',
+                                               'INSPECTION/MONITORING/LAB SERVICES', 'TELECOMMUNICATIONS',
+                                               'METER READING SERVICES' 'CHEMICALS/ADDITIVES/INDUSTRIAL GAS', ],
+                                  value='SMALL COUNT/OTHER', inplace=True)
 
     # Read in the new client data
     logging.info(f'\nLoading new client data...')
@@ -163,21 +134,12 @@ def main():
     input_df['Cleaned'] = [helpers.clean_up_string(splr) for splr in input_df.Supplier]
 
     # Reorder the columns
-    ordered_cols = [
-        'Supplier',
-        'Cleaned',
-        'Year',
-        'Total_Invoice_Amount',
-        'Total_Invoice_Count',
-        'Avg_Invoice_Size',
-    ]
+    ordered_cols = ['Supplier', 'Cleaned', 'Year', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Avg_Invoice_Size', ]
     input_df = input_df[ordered_cols]
 
     # Create unique list of suppliers
     logging.info('\nCreating unique list of suppliers...')
     suppliers = input_df[['Supplier', 'Cleaned']].dropna().drop_duplicates()
-    # suppliers.head(5)
-    # xref_list.head(5)
 
     # Merge input data with crossref
     logging.info('\nMatching supplier names against cross-reference file...')
@@ -186,9 +148,6 @@ def main():
     matched = combined[combined['_merge'] == 'both'].drop(columns=['_merge', 'Cleaned'])
     count_matched, count_unmatched = len(matched), len(unmatched)
     count_total = count_matched + count_unmatched
-    # combined.head(5)
-    # unmatched.head(5)
-    # matched.head(5)
 
     # Print info about the matching
     logging.info(f'\tTotal suppliers: {count_total}')
@@ -230,11 +189,7 @@ def main():
         .rename(columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) \
         .merge(input_df[['Cleaned', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year', ]], on='Cleaned') \
         .groupby(['Supplier', 'Cleaned', 'Supplier_ref', ]) \
-        .agg({'Softmatch_Score': 'min',
-              'Total_Invoice_Amount': 'sum',
-              'Total_Invoice_Count': 'sum',
-              'Year': 'size',
-              }) \
+        .agg({'Softmatch_Score': 'min', 'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum', 'Year': 'size', }) \
         .rename(columns={'Year': 'Year_Count'}) \
         .sort_values('Total_Invoice_Amount', ascending=False) \
         .reset_index()
@@ -259,15 +214,8 @@ def main():
     final_df['Supplier_ref'].str.upper().fillna('', inplace=True)
 
     # Rearrange columns
-    ordered_cols = [
-        'Supplier',
-        'Supplier_ref',
-        'Commodity',
-        'Year',
-        'Total_Invoice_Amount',
-        'Total_Invoice_Count',
-        'Avg_Invoice_Size',
-    ]
+    ordered_cols = ['Supplier', 'Supplier_ref', 'Commodity', 'Year', 'Total_Invoice_Amount', 'Total_Invoice_Count',
+                    'Avg_Invoice_Size', ]
     final_df = final_df[ordered_cols].sort_values(['Supplier', 'Year'])
 
     # Only include supplier-years with invoices
@@ -326,7 +274,7 @@ def main():
 
     # STEP 8d: # append all the factor scores
     scores = pd.concat([spend, size, count, commodity], axis=0, sort=False, ignore_index=True) \
-        .set_index(['Supplier', 'Supplier_ref', 'Year', 'Factor',  ]) \
+        .set_index(['Supplier', 'Supplier_ref', 'Year', 'Factor', ]) \
         .sort_index()
 
     # We were asked to re-capitalize supplier names
@@ -353,8 +301,8 @@ def main():
     # score at supplier-year level
     year_scores = factor_scores[['Supplier', 'Year', 'Factor', 'Points']] \
         .drop_duplicates(['Supplier', 'Year', 'Factor']) \
-        .set_index(['Supplier', 'Year', 'Factor',], verify_integrity=True) \
-        .unstack(level=['Year',])
+        .set_index(['Supplier', 'Year', 'Factor', ], verify_integrity=True) \
+        .unstack(level=['Year', ])
 
     # total accross all years
     total_scores = year_scores.stack() \
@@ -384,7 +332,6 @@ def main():
     factor_scores.to_excel(writer, sheet_name='Component_Scores')
     year_scores.to_excel(writer, sheet_name='Year_Scores')
     total_scores.to_excel(writer, sheet_name='Supplier_Rank')
-
     writer.save()
 
     # Stop timer
