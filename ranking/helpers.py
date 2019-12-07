@@ -133,7 +133,3 @@ def clean_up_string(inp_string):
 
 def keys_with_top_values(my_dict):
     return [(key, value) for (key, value) in my_dict.items() if value == max(my_dict.values())]
-
-
-if __name__ == '__main__':
-    ''

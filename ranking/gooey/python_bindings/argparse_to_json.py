@@ -136,9 +136,9 @@ def apply_default_rewrites(spec):
         contents = getin(spec, path)
         for group in contents:
             if group['name'] == 'positional arguments':
-                group['name'] = 'Data Sources'
+                group['name'] = ''
             if group['name'] == 'optional arguments':
-                group['name'] = 'Client Type'
+                group['name'] = ''
     return spec
 
 

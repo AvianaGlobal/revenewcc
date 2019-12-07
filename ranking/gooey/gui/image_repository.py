@@ -13,11 +13,11 @@ from ranking.gooey import merge
 
 filenames = {
     'programIcon': 'program_icon.ico',
-    'successIcon': 'AvianaLogo.png',
-    'runningIcon': 'AvianaLogo.png',
+    'successIcon': 'company_logo.png',
+    'runningIcon': 'company_logo.png',
     'loadingIcon': 'loading_icon.gif',
-    'configIcon': 'AvianaLogo.png',
-    'errorIcon': 'AvianaLogo.png'
+    'configIcon': 'company_logo.png',
+    'errorIcon': 'company_logo.png'
 }
 
 def loadImages(targetDir):
