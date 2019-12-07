@@ -3,18 +3,18 @@
 block_cipher = None
 
 
-a = Analysis(['revenewCC\\ranking.py'],
-             pathex=['C:\\Users\\MichaelJohnson\\revenewcc'],
+a = Analysis(['./ranking/ranking.py'],
+             pathex=['C:/Users/MichaelJohnson/revenewcc'],
              datas=[
-    	        ('LICENSE', '.'),
-            	('MANIFEST.in', '.'),
-             	('revenewCC/inputdata/*.csv', './revenewCC/inputdata'),
-             	('revenewCC/inputdata/*.xlsx', './revenewCC/inputdata'),
-             	('revenewCC/inputdata/*.pkl', './revenewCC/inputdata'),
-             	('gooey/images/*.png', './gooey/images'),
-             	('gooey/images/*.ico', './gooey/images'),
-             	('gooey/images/*.gif', './gooey/images'),
-             	('gooey/languages/*.json', './gooey/languages'),
+    	        ('./LICENSE', '.'),
+            	('./MANIFEST.in', '.'),
+             	('./ranking/inputdata/*.csv', './ranking/inputdata'),
+             	('./ranking/inputdata/*.xlsx', './ranking/inputdata'),
+             	('./ranking/inputdata/*.pkl', './ranking/inputdata'),
+             	('./ranking/gooey/images/*.png', './ranking/gooey/images'),
+             	('./ranking/gooey/images/*.ico', './ranking/gooey/images'),
+             	('./ranking/gooey/images/*.gif', './ranking/gooey/images'),
+             	('./ranking/gooey/languages/*.json', './ranking/gooey/languages'),
              ],
              win_no_prefer_redirects=False,
              win_private_assemblies=False,
@@ -31,7 +31,7 @@ exe = EXE(pyz,
           bootloader_ignore_signals=False,
           strip=False,
           upx=True,
-          console=True )
+          console=True)
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,
