@@ -2,7 +2,7 @@
 from gooey import Gooey, GooeyParser
 
 
-@Gooey(program_name='Revenew\nCC Supplier Ranking')
+@Gooey(program_name='Revenew\nCC Supplier Ranking', default_size=(610,630))
 def main():
     parser = GooeyParser()
     parser.add_argument('clientname', metavar='Client Name')

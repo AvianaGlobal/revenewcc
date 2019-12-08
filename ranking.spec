@@ -1,7 +1,6 @@
 
 a = Analysis(['./ranking.py'],
              pathex=['C:/Users/MichaelJohnson/revenewcc'],
-             binaries=['C:/Users/MichaelJohnson/Anaconda3/envs/revenew', '.'],
              datas=[
     	        ('./LICENSE', '.'),
              	('./inputdata/*.csv', './inputdata'),
