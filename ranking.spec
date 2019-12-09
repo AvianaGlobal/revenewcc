@@ -1,8 +1,13 @@
+# -*- mode: python ; coding: utf-8 -*-
 
-a = Analysis(['./ranking.py'],
-             pathex=['C:/Users/MichaelJohnson/revenewcc'],
+block_cipher = None
+
+
+a = Analysis(['ranking.py'],
+             pathex=['C:\\Users\\MichaelJohnson\\revenewcc'],
+             binaries=[('c:/users/michaeljohnson/anaconda3/envs/revenew/python37.dll', '.')],
              datas=[
-    	        ('./LICENSE', '.'),
+                ('./LICENSE', '.'),
              	('./inputdata/*.csv', './inputdata'),
              	('./inputdata/*.xlsx', './inputdata'),
              	('./inputdata/*.pkl', './inputdata'),
@@ -11,21 +16,26 @@ a = Analysis(['./ranking.py'],
              	('./gooey/images/*.gif', './gooey/images'),
              	('./gooey/languages/*.json', './gooey/languages'),
              ],
-             hiddenimports=['pyodbc'],
+             hiddenimports=['pyodbc', 'pywin32'],
+             hookspath=[],
+             runtime_hooks=[],
+             excludes=[],
              win_no_prefer_redirects=True,
              win_private_assemblies=True,
+             cipher=block_cipher,
              noarchive=False)
-pyz = PYZ(a.pure, a.zipped_data)
+pyz = PYZ(a.pure, a.zipped_data,
+             cipher=block_cipher)
 exe = EXE(pyz,
           a.scripts,
           [],
-          exclude_binaries=False,
+          exclude_binaries=True,
           name='ranking',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
           upx=False,
-          console=False)
+          console=False )
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,

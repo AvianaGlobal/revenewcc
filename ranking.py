@@ -2,7 +2,7 @@
 from gooey import Gooey, GooeyParser
 
 
-@Gooey(program_name='Revenew\nCC Supplier Ranking', default_size=(610,630))
+@Gooey(program_name='Revenew\nCC Supplier Ranking')
 def main():
     parser = GooeyParser()
     parser.add_argument('clientname', metavar='Client Name')
@@ -96,7 +96,7 @@ def main():
                      SELECT DISTINCT ltrim(rtrim([Vendor Name])) AS Supplier,
                                      [Invoice Date] AS Invoice_Date,
                                      [Invoice Number] AS Invoice_Number,
-                                     [Gross Invoice Amount] AS Gross_Invoice_Amount
+                                     cast([Gross Invoice Amount] as NUMERIC) AS Gross_Invoice_Amount
                      FROM {database}.dbo.invoice
                      WHERE [Vendor Name] IS NOT NULL
                  ) t
@@ -197,19 +197,21 @@ def main():
 
     #  Todo: deal with cases where there is more than one soft match
     soft_matched_dict = {item[0]: item[1][0] for item in candidates.items()}
-
-    # Add total invoice amount for soft_matches
-    soft_matched_df = pd.DataFrame(soft_matched_dict).T \
-        .merge(suppliers, left_index=True, right_on='Cleaned') \
-        .rename(columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) \
-        .merge(input_df[['Cleaned', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year', ]], on='Cleaned') \
-        .groupby(['Supplier', 'Cleaned', 'Supplier_ref', ]) \
-        .agg({'Softmatch_Score': 'min', 'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum', 'Year': 'size', }) \
-        .rename(columns={'Year': 'Year_Count'}) \
-        .sort_values('Total_Invoice_Amount', ascending=False) \
-        .reset_index()
-    # best_matches.head(5)
-    soft_matched_df['Supplier_ref'] = soft_matched_df.Supplier_ref.str.upper().fillna('')
+    if soft_matched_dict:
+        # Add total invoice amount for soft_matches
+        soft_matched_df = pd.DataFrame(soft_matched_dict).T \
+            .merge(suppliers, left_index=True, right_on='Cleaned') \
+            .rename(columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) \
+            .merge(input_df[['Cleaned', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year', ]], on='Cleaned') \
+            .groupby(['Supplier', 'Cleaned', 'Supplier_ref', ]) \
+            .agg({'Softmatch_Score': 'min', 'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum', 'Year': 'size', }) \
+            .rename(columns={'Year': 'Year_Count'}) \
+            .sort_values('Total_Invoice_Amount', ascending=False) \
+            .reset_index()
+        # best_matches.head(5)
+        soft_matched_df['Supplier_ref'] = soft_matched_df.Supplier_ref.str.upper().fillna('')
+    else:
+        soft_matched_df = pd.DataFrame({})
 
     # Combine soft matches with unmatched suppliers
     if len(soft_matched_df) > 0:
