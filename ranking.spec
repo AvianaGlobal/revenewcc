@@ -9,8 +9,8 @@ a = Analysis(['ranking.py'],
              datas=[
                 ('LICENSE', '.'),
              	('commodity.pkl', '.'),
-             	('crossref.pkl', '.')
-             	('scorecard.pkl', '.')
+             	('crossref.pkl', '.'),
+             	('scorecard.pkl', '.'),
              	('gooey/images/*.png', 'gooey/images'),
              	('gooey/images/*.ico', 'gooey/images'),
              	('gooey/images/*.gif', 'gooey/images'),
