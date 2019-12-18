@@ -9,9 +9,11 @@ env/
 docs/
 tests/
 etc/
+inputdata/
 \.DS_Store
 \.vscode
 /**/*.pyc
 /**/log.txt
 /**/*.lnk
 /RevenewCC.zip
+

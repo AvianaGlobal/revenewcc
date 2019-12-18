@@ -53,7 +53,7 @@ def main():
 
     # Set up logging
     start = timer()
-    log_file = './log.txt'
+    log_file = 'log.txt'
     logging.basicConfig(filename=log_file, level=logging.DEBUG)
     handler = logging.StreamHandler()
     logger = logging.getLogger()
@@ -65,9 +65,9 @@ def main():
     logging.info('\nSetting up workspace...')
 
     # # Read in all Resource Files
-    xref_list = pd.read_pickle('./inputdata/crossref.pkl')
-    cmdty_list = pd.read_pickle('./inputdata/commodity.pkl')
-    scorecard = pd.read_pickle('./inputdata/scorecard.pkl')
+    xref_list = pd.read_pickle('crossref.pkl')
+    cmdty_list = pd.read_pickle('commodity.pkl')
+    scorecard = pd.read_pickle('scorecard.pkl')
 
     # Merge crossref and commodities
     cmdty_df = (pd
