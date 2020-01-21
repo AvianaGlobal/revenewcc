@@ -7,12 +7,12 @@ def main():
     parser = GooeyParser()
     parser.add_argument('clientname', metavar='Client Name')
     parser.add_argument('outputdir', metavar='Output Folder', widget='DirChooser')
+    parser.add_argument('dsn', metavar='DSN')
+    parser.add_argument('username', metavar='Username')
+    parser.add_argument('password', metavar='Password', widget='PasswordField')
 
     spr_grp = parser.add_argument_group('Option 1: SPR Client')
-    spr_grp.add_argument('--dsn', metavar='DSN')
     spr_grp.add_argument('--database', metavar='Database')
-    spr_grp.add_argument('--username', metavar='Username')
-    spr_grp.add_argument('--password', metavar='Password', widget='PasswordField')
 
     nonspr_grp = parser.add_argument_group('Option 2: Non-SPR Client')
     nonspr_grp.add_argument('--filename', metavar='Rolled Up', widget='FileChooser',
@@ -65,9 +65,9 @@ def main():
     logging.info('\nSetting up workspace...')
 
     # # Read in all Resource Files
-    xref_list = pd.read_pickle('crossref.pkl')
-    cmdty_list = pd.read_pickle('commodity.pkl')
-    scorecard = pd.read_pickle('scorecard.pkl')
+    xref_list = pd.read_sql_table('crossref')
+    cmdty_list = pd.read_sql_table('commodity')
+    scorecard = pd.read_sql_table('scorecard')
 
     # Merge crossref and commodities
     cmdty_df = (pd
@@ -204,7 +204,8 @@ def main():
             .rename(columns={0: 'Supplier_ref', 1: 'Softmatch_Score'}) \
             .merge(input_df[['Cleaned', 'Total_Invoice_Amount', 'Total_Invoice_Count', 'Year', ]], on='Cleaned') \
             .groupby(['Supplier', 'Cleaned', 'Supplier_ref', ]) \
-            .agg({'Softmatch_Score': 'min', 'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum', 'Year': 'size', }) \
+            .agg(
+            {'Softmatch_Score': 'min', 'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum', 'Year': 'size', }) \
             .rename(columns={'Year': 'Year_Count'}) \
             .sort_values('Total_Invoice_Amount', ascending=False) \
             .reset_index()
