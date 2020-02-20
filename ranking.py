@@ -6,12 +6,12 @@ from gooey import Gooey, GooeyParser
 def main():
     parser = GooeyParser()
     parser.add_argument('clientname', metavar='Client Name')
-    parser.add_argument('outputdir', metavar='Output Folder', widget='DirChooser')
     parser.add_argument('dsn', metavar='DSN')
-    parser.add_argument('username', metavar='Username')
-    parser.add_argument('password', metavar='Password', widget='PasswordField')
+    parser.add_argument('outputdir', metavar='Output Folder', widget='DirChooser')
 
     spr_grp = parser.add_argument_group('Option 1: SPR Client')
+    # spr_grp.add_argument('--username', metavar='Username')
+    # spr_grp.add_argument('--password', metavar='Password', widget='PasswordField')
     spr_grp.add_argument('--database', metavar='Database')
 
     nonspr_grp = parser.add_argument_group('Option 2: Non-SPR Client')
@@ -25,8 +25,8 @@ def main():
     dsn = args.dsn
     clientname = args.clientname
     database = args.database
-    username = args.username
-    password = args.password
+    # username = args.username
+    # password = args.password
     outputdir = args.outputdir
     filename = args.filename
     filename2 = args.filename2
@@ -46,10 +46,12 @@ def main():
     threshold = 89
 
     # Make database connection engine (with debug settings)
-    cnxn_str = f'mssql+pyodbc://{username}:{password}@{dsn}'
+    # if username and password:
+    #     cnxn_str = f'mssql+pyodbc://{username}:{password}@{dsn}'
+    # else:
+    cnxn_str = f'mssql+pyodbc://@{dsn}'
     engine = create_engine(cnxn_str, fast_executemany=True, isolation_level='AUTOCOMMIT')
-    if dsn:
-        engine.connect()
+    con = engine.connect()
 
     # Set up logging
     start = timer()
@@ -65,9 +67,9 @@ def main():
     logging.info('\nSetting up workspace...')
 
     # # Read in all Resource Files
-    xref_list = pd.read_sql_table('crossref')
-    cmdty_list = pd.read_sql_table('commodity')
-    scorecard = pd.read_sql_table('scorecard')
+    xref_list = pd.read_sql_table('crossref', con, schema='dbo')
+    cmdty_list = pd.read_sql_table('commodity', con, schema='dbo')
+    scorecard = pd.read_sql_table('scorecard', con, schema='dbo')
 
     # Merge crossref and commodities
     cmdty_df = (pd
@@ -158,7 +160,7 @@ def main():
 
     # Merge input data with crossref
     logging.info('\nMatching supplier names against cross-reference file...')
-    combined = pd.merge(suppliers, xref_list, on='Supplier', how='outer', indicator=True)
+    combined = pd.merge(suppliers, xref_list, on='Supplier', how='left', indicator=True)
     unmatched = combined[combined['_merge'] == 'left_only'].drop(columns=['_merge', 'Supplier_ref'])
     matched = combined[combined['_merge'] == 'both'].drop(columns=['_merge', 'Cleaned'])
     count_matched, count_unmatched = len(matched), len(unmatched)
@@ -210,7 +212,6 @@ def main():
             .sort_values('Total_Invoice_Amount', ascending=False) \
             .reset_index()
         # best_matches.head(5)
-        soft_matched_df['Supplier_ref'] = soft_matched_df.Supplier_ref.str.upper().fillna('')
     else:
         soft_matched_df = pd.DataFrame({})
 
@@ -219,11 +220,10 @@ def main():
         soft_matched = soft_matched_df[['Supplier', 'Supplier_ref']].drop_duplicates()
         # Add best matches back to supplier list
         matched = pd.concat([matched, soft_matched], axis=0, sort=True, ignore_index=True)
-        xref = matched.merge(cmdty_df, on='Supplier_ref')
-        final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')
-    else:
-        xref = matched.merge(cmdty_df, on='Supplier_ref')
-        final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')
+
+    # Combine suppliers and commodities
+    xref = matched.merge(cmdty_df, on='Supplier_ref')
+    final_df = input_df.merge(xref, on='Supplier', how='left').drop(columns='Cleaned')
 
     # Update commodities that are missing because they were unmatched
     final_df['Commodity'].fillna('NOT AVAILABLE', inplace=True)
