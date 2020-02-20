@@ -43,7 +43,7 @@ def main():
     import helpers
 
     # Set default threshold for soft-matching
-    threshold = 89
+    threshold = 50
 
     # Make database connection engine (with debug settings)
     # if username and password:
@@ -229,7 +229,7 @@ def main():
     final_df['Commodity'].fillna('NOT AVAILABLE', inplace=True)
 
     # Fill in Supplier_ref with blanks where not available
-    final_df['Supplier_ref'].str.upper().fillna('', inplace=True)
+    final_df['Supplier_ref'] = final_df['Supplier_ref'].str.upper().fillna('')
 
     # Rearrange columns
     ordered_cols = ['Supplier', 'Supplier_ref', 'Commodity', 'Year', 'Total_Invoice_Amount', 'Total_Invoice_Count',
@@ -259,7 +259,7 @@ def main():
     matched_df['Supplier_ref'] = [s.upper() for s in matched_df.Supplier_ref]
     # matched_df.head(5)
 
-    # Scorecard computations  # Fixme
+    # Scorecard computations
     logging.info('\nCalculating supplier scores based on scorecard...')
 
     # STEP 8b: do a full outer join with the scorecard
@@ -294,8 +294,6 @@ def main():
     scores = pd.concat([spend, size, count, commodity], axis=0, sort=False, ignore_index=True) \
         .set_index(['Supplier', 'Supplier_ref', 'Year', 'Factor', ]) \
         .sort_index()
-
-    # We were asked to re-capitalize supplier names
 
     # Dealing with the weird way the scorecard calculations were originally done... reshaping and merging the data
     factor_scores = final_df \
