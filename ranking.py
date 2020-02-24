@@ -8,6 +8,7 @@ def main():
     parser.add_argument('clientname', metavar='Client Name')
     parser.add_argument('dsn', metavar='DSN')
     parser.add_argument('outputdir', metavar='Output Folder', widget='DirChooser')
+    parser.add_argument('threshold', metavar='Soft-match Threshold (0-100)')
 
     spr_grp = parser.add_argument_group('Option 1: SPR Client')
     # spr_grp.add_argument('--username', metavar='Username')
@@ -30,6 +31,7 @@ def main():
     outputdir = args.outputdir
     filename = args.filename
     filename2 = args.filename2
+    threshold = int(args.threshold)
 
     # Import packages
     import os
@@ -42,13 +44,6 @@ def main():
     from timeit import default_timer as timer
     import helpers
 
-    # Set default threshold for soft-matching
-    threshold = 50
-
-    # Make database connection engine (with debug settings)
-    # if username and password:
-    #     cnxn_str = f'mssql+pyodbc://{username}:{password}@{dsn}'
-    # else:
     cnxn_str = f'mssql+pyodbc://@{dsn}'
     engine = create_engine(cnxn_str, fast_executemany=True, isolation_level='AUTOCOMMIT')
     con = engine.connect()
@@ -64,6 +59,7 @@ def main():
     # Print startup messages
     logging.info(f'\nApplication started ... ({time.ctime()})')
     logging.info(f'\nCurrent working directory: {os.getcwd()}')
+    logging.info(f'\nSoft-match threshold (0-100): {threshold}')
     logging.info('\nSetting up workspace...')
 
     # # Read in all Resource Files
@@ -170,7 +166,7 @@ def main():
     logging.info(f'\tTotal suppliers: {count_total}')
     logging.info(f'\tMatched suppliers: {count_matched}')
     logging.info(f'\tUnmatched suppliers: {count_unmatched}')
-    logging.info(f'\nTrying to soft-match the unmatched suppliers...')
+    logging.info(f'\nTrying to soft-match the unmatched suppliers (threshold = {threshold})...')
     unmatched_series = unmatched['Cleaned']
     reference_series = cmdty_df['Supplier_ref']
 
@@ -229,7 +225,7 @@ def main():
     final_df['Commodity'].fillna('NOT AVAILABLE', inplace=True)
 
     # Fill in Supplier_ref with blanks where not available
-    final_df['Supplier_ref'] = final_df['Supplier_ref'].str.upper().fillna('')
+    final_df['Supplier_ref'] = final_df['Supplier_ref'].fillna('')
 
     # Rearrange columns
     ordered_cols = ['Supplier', 'Supplier_ref', 'Commodity', 'Year', 'Total_Invoice_Amount', 'Total_Invoice_Count',
@@ -240,7 +236,7 @@ def main():
     final_df = final_df[final_df.Total_Invoice_Amount > 0]
 
     # Output invoice amounts for unmatched suppliers  # # Note: these are grouped by Supplier
-    unmatched_df = final_df[final_df.Supplier_ref.isna()] \
+    unmatched_df = final_df[final_df.Supplier_ref == ''] \
         .groupby('Supplier') \
         .agg({'Total_Invoice_Amount': 'sum', 'Total_Invoice_Count': 'sum', 'Year': 'size'}) \
         .rename(columns={'Year': 'Year_Count'}) \
@@ -256,7 +252,6 @@ def main():
         .sort_values('Total_Invoice_Amount', ascending=False) \
         .reset_index() \
         .merge(matched)  # Have to re-merge the input data to get original supplier name
-    matched_df['Supplier_ref'] = [s.upper() for s in matched_df.Supplier_ref]
     # matched_df.head(5)
 
     # Scorecard computations
