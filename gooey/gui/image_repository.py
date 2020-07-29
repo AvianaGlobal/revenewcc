@@ -12,13 +12,14 @@ from gooey.gui.util.freeze import getResourcePath
 from gooey.util.functional import merge
 
 filenames = {
-    'programIcon': 'program_icon.ico',
-    'successIcon': 'AvianaLogo.png',
-    'runningIcon': 'AvianaLogo.png',
+    'programIcon': 'program_icon.png',
+    'successIcon': 'success_icon.png',
+    'runningIcon': 'running_icon.png',
     'loadingIcon': 'loading_icon.gif',
-    'configIcon': 'AvianaLogo.png',
-    'errorIcon': 'AvianaLogo.png'
+    'configIcon': 'config_icon.png',
+    'errorIcon': 'error_icon.png'
 }
+
 
 def loadImages(targetDir):
     defaultImages = resolvePaths(getResourcePath('images'), filenames)

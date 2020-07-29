@@ -3,27 +3,27 @@ Primary orchestration and control point for Gooey.
 """
 
 import sys
-from itertools import chain
 
 import wx
+from wx.adv import TaskBarIcon
 
+from gooey.gui import cli
 from gooey.gui import events
-from gooey.gui.components.header import FrameHeader
-from gooey.gui.components.footer import Footer
-from gooey.gui.util import wx_util
+from gooey.gui import seeder
+from gooey.gui.components import modals
 from gooey.gui.components.config import ConfigPage, TabbedConfigPage
+from gooey.gui.components.console import Console
+from gooey.gui.components.footer import Footer
+from gooey.gui.components.header import FrameHeader
+from gooey.gui.components.menubar import MenuBar
 from gooey.gui.components.sidebar import Sidebar
 from gooey.gui.components.tabbar import Tabbar
-from gooey.util.functional import getin, assoc, flatmap, compact
-from gooey.python_bindings import constants
-from gooey.gui.pubsub import pub
-from gooey.gui import cli
-from gooey.gui.components.console import Console
 from gooey.gui.lang.i18n import _
 from gooey.gui.processor import ProcessController
+from gooey.gui.pubsub import pub
+from gooey.gui.util import wx_util
 from gooey.gui.util.wx_util import transactUI
-from gooey.gui.components import modals
-from gooey.gui import seeder
+from gooey.python_bindings import constants
 
 
 class GooeyApplication(wx.Frame):
@@ -36,6 +36,9 @@ class GooeyApplication(wx.Frame):
         self._state = {}
         self.buildSpec = buildSpec
 
+        self.applyConfiguration()
+        self.menu = MenuBar(buildSpec)
+        self.SetMenuBar(self.menu)
         self.header = FrameHeader(self, buildSpec)
         self.configs = self.buildConfigPanels(self)
         self.navbar = self.buildNavigation()
@@ -46,7 +49,9 @@ class GooeyApplication(wx.Frame):
         self.clientRunner = ProcessController(
             self.buildSpec.get('progress_regex'),
             self.buildSpec.get('progress_expr'),
-            self.buildSpec.get('encoding')
+            self.buildSpec.get('hide_progress_msg'),
+            self.buildSpec.get('encoding'),
+            self.buildSpec.get('requires_shell'),
         )
 
         pub.subscribe(events.WINDOW_START, self.onStart)
@@ -68,6 +73,10 @@ class GooeyApplication(wx.Frame):
             self.onStart()
 
 
+    def applyConfiguration(self):
+        self.SetTitle(self.buildSpec['program_name'])
+        self.SetBackgroundColour(self.buildSpec.get('body_bg_color'))
+
     def onStart(self, *args, **kwarg):
         """
         Verify user input and kick off the client's program if valid
@@ -76,6 +85,8 @@ class GooeyApplication(wx.Frame):
             config = self.navbar.getActiveConfig()
             config.resetErrors()
             if config.isValid():
+                if self.buildSpec['clear_before_run']:
+                    self.console.clear()
                 self.clientRunner.run(self.buildCliString())
                 self.showConsole()
             else:
@@ -100,17 +111,12 @@ class GooeyApplication(wx.Frame):
         group = self.buildSpec['widgets'][self.navbar.getSelectedGroup()]
         positional = config.getPositionalArgs()
         optional = config.getOptionalArgs()
-        print(cli.buildCliString(
-            self.buildSpec['target'],
-            group['command'],
-            positional,
-            optional
-        ))
         return cli.buildCliString(
             self.buildSpec['target'],
             group['command'],
             positional,
-            optional
+            optional,
+            suppress_gooey_flag=self.buildSpec['suppress_gooey_flag']
         )
 
 
@@ -132,7 +138,8 @@ class GooeyApplication(wx.Frame):
                     self.showForceStopped()
                 else:
                     self.showError()
-                    wx.CallAfter(modals.showFailure)
+                    if self.buildSpec.get('show_failure_modal'):
+                        wx.CallAfter(modals.showFailure)
 
 
     def onStopExecution(self):
@@ -182,7 +189,15 @@ class GooeyApplication(wx.Frame):
         self.SetSizer(sizer)
         self.console.Hide()
         self.Layout()
-        self.SetIcon(wx.Icon(self.buildSpec['images']['programIcon'], wx.BITMAP_TYPE_ICO))
+        # Program Icon (Windows)
+        icon = wx.Icon(self.buildSpec['images']['programIcon'], wx.BITMAP_TYPE_PNG)
+        self.SetIcon(icon)
+        if sys.platform != 'win32':
+            # OSX needs to have its taskbar icon explicitly set
+            # bizarrely, wx requires the TaskBarIcon to be attached to the Frame
+            # as instance data (self.). Otherwise, it will not render correctly.
+            self.taskbarIcon = TaskBarIcon(iconType=wx.adv.TBI_DOCK)
+            self.taskbarIcon.SetIcon(icon)
 
 
 
@@ -202,7 +217,7 @@ class GooeyApplication(wx.Frame):
     def buildConfigPanels(self, parent):
         page_class = TabbedConfigPage if self.buildSpec['tabbed_groups'] else ConfigPage
 
-        return [page_class(parent, widgets)
+        return [page_class(parent, widgets, self.buildSpec)
                 for widgets in self.buildSpec['widgets'].values()]
 
 
@@ -231,7 +246,10 @@ class GooeyApplication(wx.Frame):
     def showComplete(self):
         self.navbar.Show(False)
         self.console.Show(True)
-        self.footer.showButtons('edit_button', 'restart_button', 'close_button')
+        buttons = (['edit_button', 'restart_button', 'close_button']
+                   if self.buildSpec.get('show_restart_button', True)
+                   else ['edit_button', 'close_button'])
+        self.footer.showButtons(*buttons)
         self.footer.progress_bar.Show(False)
 
 

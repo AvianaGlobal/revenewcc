@@ -1,5 +1,0 @@
-include LICENSE
-include revenewCC/inputdata/*.csv
-include gooey/images/*.png
-include gooey/languages/*.json
-include gooey/tests/*.json
